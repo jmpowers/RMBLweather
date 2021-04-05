@@ -1,0 +1,386 @@
+--- 
+title: "RMBL Weather Data"
+author: "[John Powers](http://sites.uci.edu/powers/)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    self_contained: no
+    lib_dir: libs
+    code_folding: hide
+    toc: yes
+    toc_float: TRUE
+editor_options: 
+  chunk_output_type: console
+---
+<style type="text/css">
+.main-container { max-width: 1000px; margin-left: 0; margin-right: auto; }
+img{ max-width:200%; height: auto; }
+td, th { padding : 6px }
+</style>
+
+# Purpose
+
+Compile weather records near the Rocky Mountain Biological Laboratory in Gothic, CO and analyze long-term trends in precipitation and temperature.
+
+```{r setup, message=FALSE}
+library(tidyverse)
+library(lubridate)
+library(viridis)
+library(RColorBrewer)
+library(GGally)
+library(knitr)
+library(kableExtra)
+knitr::opts_chunk$set(comment="", cache=T, warning = F, message = F, fig.path = "images_weather/")
+
+maxfield_coords <- data.frame(id = "maxfield", name="MaxfieldMdw", latitude = 38.9495, longitude = -106.9908)
+```
+
+# Datasets
+
+## WRCC
+
+Weather data from billy barr's RMBL station in Gothic, CO, USA provided by the Western Regional Climate Center
+Original (not FPA - unavailable) data from 2009-2021 in metric units
+Downloaded as xls (which results in a tsv that needs quotes added) from https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corbil
+Columns renamed from WRCC names according to /data/weather/WRCC/weather_wrcc_metadata.csv
+Flags on each column indicate 0 = raw data, (M)issing data, (E)stimated data, (N)on-measuring time interval, per https://wrcc.dri.edu/cgi-bin/wea_listex.pl?flags
+
+```{r WRCC}
+
+tenmin_CORBIL <- read_tsv("data/weather/WRCC/wrcc_corbil.tsv.gz", skip = 4, 
+               col_types=paste0(wrcc_metadata$col_type, collapse=""), col_names=wrcc_metadata$name_metric) %>% 
+  filter(date >= as.Date("2015-07-01"))#when precip starts to have reasonable values, temp starts 2015-10-01.
+#no missing precip values in CORBIL - may not have been quality checked.
+hourly_CORBIL <- tenmin_CORBIL %>% mutate(hour=hour(time)) %>% group_by(date, hour) %>% summarize(precip_mm = sum(precip_mm), av_temp_2m_C=mean(av_temp_2m_C)) #take the mean of the precip rate per hour that is reported every 10 min
+daily_CORBIL <- hourly_CORBIL %>% group_by(date) %>% 
+  summarize(precip_mm = sum(precip_mm), #sum the hourly precip rates over each 24 hrs 
+            av_temp_2m_C=mean(av_temp_2m_C), max_temp_2m_C = max(av_temp_2m_C), min_temp_2m_C = min(av_temp_2m_C)) %>% 
+  mutate(year=factor(year(date)), julian=yday(date),
+         precip_mm = ifelse(precip_mm>50, NA, precip_mm)) #cut errors >50mm/day from daily_CORBIL
+
+# Other data (no precip) for Kettle Ponds S of Gothic, CO and Judd Falls E of Gothic, CO
+
+wrcc_metadata_noflags <- read_tsv("data/weather/WRCC/weather_wrcc_metadata.tsv") %>% mutate(index = row_number(), flag=F)
+wrcc_metadata <- bind_rows(wrcc_metadata_noflags, wrcc_metadata_noflags %>% select(name_metric, col_type, index) %>% 
+                             filter(! name_metric %in% c("date","time")) %>% 
+  mutate(name_metric=paste0("flag_",name_metric), col_type="f",flag=T)) %>% arrange(index) %>% fill(id)
+
+get_WRCC_id <- function(filename) toupper(str_match(filename, "wrcc_([a-z]+)")[,2])
+tenmin_WRCC <- list.files("data/weather/WRCC/", ".tsv.gz", full.names=T) %>% set_names(get_WRCC_id(.)) %>% 
+  map_dfr( ~ read_tsv(.x, skip = 4, na=c("","M"), col_types=paste0(filter(wrcc_metadata, id==get_WRCC_id(.x))$col_type, collapse=""),
+                      col_names=filter(wrcc_metadata, id==get_WRCC_id(.x))$name_metric), .id="id") 
+hourly_WRCC <- tenmin_WRCC %>% mutate(hour=hour(time)) %>% group_by(id, date, hour) %>% summarize(precip_mm = sum(precip_mm), av_temp_2m_C=mean(av_temp_2m_C)) #take the mean of the precip rate per hour that is reported every 10 min
+daily_WRCC <- hourly_WRCC %>% group_by(id, date) %>% 
+  summarize(precip_mm = sum(precip_mm), #sum the hourly precip rates over each 24 hrs 
+            av_temp_2m_C=mean(av_temp_2m_C), max_temp_2m_C = max(av_temp_2m_C), min_temp_2m_C = min(av_temp_2m_C)) %>% 
+  mutate(year=factor(year(date)), julian=yday(date),
+         precip_mm = ifelse(precip_mm>50, NA, precip_mm)) #cut errors >50mm/day from daily_CORBIL
+
+  #TODO for CORBIL filter(date >= as.Date("2015-07-01"))#when precip starts to have reasonable values, temp starts 2015-10-01.
+#no missing precip values in CORBIL - may not have been quality checked.
+```
+
+## Wunderground
+
+Weather data from Gold Link station in Mt. Crested Butte.
+Michelle Newcomer and David Brian Rogers. 2020. Gap-filled meteorological data (2011-2020) and modeled potential evapotranspiration data from the KCOMTCRE2 WeatherUnderground weather station, from the East River Watershed, Colorado. ESS-DIVE: Deep Insight for Earth Science Data. doi:10.15485/1734790, version: ess-dive-ce2fd798f9d81f5-20201210T030125380.
+
+```{r Wunderground}
+daily_KCOMTCRE2 <- read_csv("data/weather/Wunderground/2011_2020_KComCret_1day_ETModeled.csv")
+```
+
+## EPA CASTNET
+
+Weather data from EPA CASTNET GTH161 station, Gothic Research Meadow https://www3.epa.gov/castnet/site_pages/GTH161.html
+Precip data is missing after 2011
+
+```{r EPA_CASTNET}
+hourly_GTH161 <- read_csv("data/weather/EPA_CASTNET/CASTNET_GTH161_Meteorological_Hourly.csv.gz", 
+                          col_types=cols(DATE_TIME=col_datetime("%m/%d/%Y %H:%M:%S"), QA_CODE=col_character()))
+daily_GTH161 <- hourly_GTH161 %>% mutate(date = date(DATE_TIME)) %>% filter(year(date) < 2012) %>% group_by(date) %>% 
+  summarize(TEMPERATURE=mean(TEMPERATURE, na.rm=T), PRECIPITATION = sum(PRECIPITATION, na.rm=T)) #TODO this keeps precip sums when there is missing data, including an entire day!
+```
+
+
+## NOAA
+
+Includes Crested Butte, Schofield Pass, and billy barr's station in Gothic, and more. https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail
+
+```{r NOAA}
+library(rnoaa)
+station_data <- ghcnd_stations()# long download unless cached
+(NOAA_stations <- meteo_nearby_stations(lat_lon_df = maxfield_coords, station_data = station_data,
+                      radius = 10, var = c("PRCP", "TAVG"))$maxfield %>% #stations within 10 km radius of maxfield
+    left_join(station_data %>% filter(element=="PRCP")))
+remove(station_data)
+NOAA_stations_name <- with(NOAA_stations, set_names(name, id))
+
+daily_NOAA <- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %>% 
+  mutate(across(contains("flag"), as.factor)) %>% #All units are in tenths of mm, converted to mm here.
+  mutate(across(c("prcp","snow","snwd","wesd","wesf"), ~ as.integer(.x)/10, .names="{.col}_mm"), .keep="unused") %>% 
+  mutate(across(c("tmin","tavg","tmax"), ~ as.integer(.x)/10, .names="{.col}_C"), .keep="unused") %>% 
+  mutate(date = date - days(1)) # comparison of other 3 stations shows at least the US1COGN0018 precip is recorded the next day
+
+```
+
+## NCEI
+
+Global Surface Summary of the Day ('GSOD') weather data from the from the USA National Centers for Environmental Information ('NCEI').
+https://www1.ncdc.noaa.gov/pub/data/gsod/readme.txt
+https://www1.ncdc.noaa.gov/pub/data/noaa/isd-inventory.txt
+Only get Gunnison/Crested Butte and Aspen airports - 50 km away from Gothic
+
+```{r NCEI, eval=FALSE}
+library(GSODR)
+gsodr.inventory <- get_inventory() %>% #long download
+  filter(STNID %in% nearest_stations(38.9495, -106.9908,50))
+```
+
+## gothicwx
+
+billy barr's snow records from gothicwx.org
+
+```{r gothicwx}
+groundcover <- read_tsv("./data/weather/gothicwx/groundcover.tsv") %>% 
+  mutate(across(starts_with("first"), list(day=yday)), year=year(first_0_cm))
+
+first_snow_2020 <- as.POSIXct(c("2020-10-25", "2020-12-31"), tz="UTC") #TODO check this first permanent snow of 2020 (not yet on billy's website)
+```
+
+## Combine datasets
+
+```{r combine_data}
+#Combine weather station data in long format
+daily_long <- bind_rows( 
+  GTH161 = hourly_GTH161 %>% arrange(DATE_TIME) %>% mutate(date = date(DATE_TIME)) %>% group_by(date) %>% 
+    summarize(tavg_C=mean(TEMPERATURE), tmax_C=max(TEMPERATURE), tmin_C=min(TEMPERATURE),       #NA if missing any temperatures,
+              prcp_mm = ifelse(sum(is.na(PRECIPITATION))==0, sum(PRECIPITATION, na.rm=T), NA)), #or any precip (unlike day_GTH161)
+  KCOMTCRE2 = daily_KCOMTCRE2 %>% select(date, tavg_C = Tmean, tmax_C = Tmax, tmin_C = Tmin, prcp_mm = Precip),
+  CORBIL= daily_CORBIL %>% select(date, tavg_C = av_temp_2m_C, tmax_C = max_temp_2m_C, tmin_C = min_temp_2m_C, prcp_mm = precip_mm), #curiously, no NAs
+  .id="id") %>% bind_rows(daily_NOAA %>% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %>% mutate(id=factor(id))
+
+#Combine weather station data in wide format
+stations <- c(GTH161="EPA_RsrchMdw",KCOMTCRE2="ESSDIVE_GoldLink",CORBIL="WRCC_billy",billy="NOAA_billy")#station="source_location"
+daily_all <- daily_NOAA %>% filter(id == "US1COGN0018") %>% 
+  full_join(daily_GTH161) %>% full_join(daily_KCOMTCRE2) %>% full_join(daily_CORBIL) %>% 
+  rename(EPA_RsrchMdw=PRECIPITATION, ESSDIVE_GoldLink=Precip, WRCC_billy=precip_mm, NOAA_billy=prcp_mm) %>% 
+  mutate(yr = year(date), mo = month(date, label=F),
+         ground_covered = factor(c("smmr","wntr"))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by="day")))]) 
+```
+
+Fill in EPA CASTNET data since 2011 with NOAA precip from billy's station in Gothic.
+```{r EPA_NOAA_fill}
+#correlate daily EPA_RsrchMdw and NOAA_billy to predict what EPA would look like for 2012-2020
+EPA_NOAA_daily_model <-  lm(EPA_RsrchMdw ~ NOAA_billy:ground_covered+0, data=daily_all)
+#EPA_NOAA_monthly_model <-lm(EPA_RsrchMdw ~ NOAA_billy*season, data=monthly_all %>% 
+#mutate(season=factor(c("wntr","smmr"))[1+mo %in% 6:9]))
+daily_all <- daily_all %>% 
+  mutate(EPA_predicted = is.na(EPA_RsrchMdw) & !is.na(NOAA_billy),
+         EPA_NOAA_filled = ifelse(is.na(EPA_RsrchMdw), predict(EPA_NOAA_daily_model, newdata=daily_all), EPA_RsrchMdw),)
+stations <- c("EPA_NOAA_filled", stations)
+monthly_all <- daily_all %>% group_by(yr, mo) %>% 
+  summarize(across(unname(stations), ~ ifelse(sum(is.na(.x))>5, NA, sum(.x, na.rm=T))), .groups="drop") %>% arrange(yr, mo) 
+
+save(daily_all, file="data/weather/rmbl_weather.rda")
+```
+
+# Station map
+
+```{r station_metadata}
+all_stations <- bind_rows(
+  NOAA_stations %>% mutate(source="NOAA", url=paste0("https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:",id,"/detail")), 
+  read_tsv("data/weather/stations.tsv") %>% 
+  rnoaa::meteo_process_geographic_data(lat = maxfield_coords$latitude, long = maxfield_coords$long) %>% 
+    mutate(element="PRCP")) %>% 
+  mutate(source_name = paste(source, name, sep="_")) %>% 
+  rows_patch(daily_long %>% drop_na(prcp_mm)  %>% group_by(id) %>% summarize(first_year=min(year(date)), last_year=max(year(date))))
+
+all_stations %>% mutate(id = cell_spec(id, "html", link = url), .keep="unused") %>%
+  select(-c(state, gsn_flag, wmo_id, source_name)) %>% relocate(source) %>% 
+  kable("html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("hover", "condensed")) 
+```
+
+```{r station_map}
+station_pal <- set_names()
+
+library(OpenStreetMap)
+map <- openmap(c(39.05, -107.1), c(38.85, -106.9), zoom = NULL,
+               type = c("osm", "stamen-toner", "stamen-terrain","stamen-watercolor", "esri","esri-topo")[3],
+               mergeTiles = TRUE)
+map.latlon <- openproj(map, projection = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+autoplot(map.latlon) + 
+  geom_point(data=bind_rows(all_stations, maxfield_coords), 
+             aes(x=longitude, y=latitude, color=str_replace(name, "CRESTED BUTTE","CB")), size=2) + 
+  theme(legend.position="bottom", axis.title=element_blank()) + labs(color="Station") #+ scale_color_brewer(palette="Set1")
+
+
+```
+
+# Daily weather
+
+```{r weather_daily}
+ggplot(daily_all %>% filter(year(date) %in% 2018:2020), aes(y=EPA_NOAA_filled, x=yday(date))) + geom_col(aes(fill=ground_covered)) + 
+  facet_wrap(vars(year(date)), ncol=1) + labs(x="Day of year", y="EPA/NOAA precipiation (mm)", fill="Snow cover")
+
+daily_all %>% pivot_longer(unname(stations), names_to="station", values_to="precipitation_mm") %>% 
+  filter(yday(date) >100, yday(date) < 240, year(date) %in% 2018:2020) %>%
+  ggplot(aes(x=yday(date), y=precipitation_mm, color=station, shape=ground_covered)) +  
+  geom_line() +  geom_point() + facet_wrap(vars(year), ncol=1) + theme(legend.position = "top", legend.direction="vertical") +
+  labs(x="Day of year", y = "Precipitation (mm)", color="Station", shape="Snow cover")
+
+precip_max <- 50
+lower_continuous <- function (data, mapping, ...) {
+    ggally_smooth(data = data, mapping = mapping, ..., method = "loess") + scale_shape_manual(values=c(1,2))+
+    coord_cartesian(xlim=c(0,precip_max), ylim=c(0,precip_max)) + geom_abline(slope=1, intercept=0)+
+    scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))+scale_y_continuous(breaks=seq(0,precip_max, by=precip_max/5))
+}
+lower_combo <- function (data, mapping, ...) {
+    ggally_facethist(data = data, mapping = mapping, binwidth=precip_max/50,...) +
+    coord_cartesian(xlim=c(0,precip_max)) + scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))
+}
+ggpairs(daily_all %>% select(all_of(unname(stations[-1])), ground_covered), mapping=aes(color=ground_covered,shape=ground_covered), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))
+
+filter(daily_all) %>% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + labs(color="Snow cover")
+```
+
+# Monthly weather
+
+```{r weather_monthly}
+#recalculate Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station
+(EPA_89_06_July_avg_mm <- monthly_all %>% filter(mo==7, yr >= 1989, yr <= 2006) %>% pull(EPA_NOAA_filled) %>% mean)
+
+(water_addition_per_month_mm <- (14 / 4 / 2) * 31) #14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July
+
+monthly_all %>% pivot_longer(unname(stations), names_to="station", values_to="precipitation_mm") %>% 
+ggplot(aes(x=mo*30.4-15.2, y=precipitation_mm, color=station)) + facet_wrap(vars(yr)) + #place points at month midpoint
+  #geom_rect(data=waterdates %>% pivot_wider(names_from=precip_treatments, values_from=c(day, date)) %>% mutate(yr=factor(year)), 
+  #          aes(xmin=day_started, xmax=day_ended, ymin=0, ymax=water_addition_per_month_mm), inherit.aes=F,
+  #          fill=water_pal["Addition"])+
+  geom_line() +  geom_point()+
+  geom_point(data=groundcover %>% filter(year>=2004) %>% mutate(yr=factor(year)), aes(x=first_0_cm_day,y=0), inherit.aes=F)+
+  geom_point(data=groundcover %>% filter(year>=2005) %>% mutate(yr=factor(year-1)), aes(x=first_snow_day,y=0), inherit.aes=F)+
+  labs(y="Monthly precipitation (mm)", x="Day of the year, with snowmelt and first snow dates", color="Station") +
+  theme(legend.position="top") + coord_cartesian(ylim=c(0,200))
+
+precip_max <- 250
+ggpairs(monthly_all %>% mutate(season=factor(c("wntr","smmr"))[1+mo %in% 6:9]) %>% select(all_of(unname(stations[-1])), season), mapping=aes(color=season,shape=season), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))
+
+filter(monthly_all) %>% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ifelse(mo %in% 6:9,mo,"Oct - May"))) + geom_point() + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + labs(color="Month")
+
+monthly_all %>% filter(mo %in% 5:9) %>% 
+  ggplot(aes(x=mo,  y=EPA_NOAA_filled)) + geom_smooth(span=0.5, color="black") +
+  geom_line(aes(color=ifelse(yr>=2018, "study period (filled)", ifelse(yr>=2012,"filled from billy's NOAA data","original EPA data")), group=yr)) +
+  geom_point(x=7, y=EPA_89_06_July_avg_mm)+ scale_y_continuous(limits=c(0,100))+
+  geom_text(aes(label=ifelse(yr>=2018, yr, "")))  + 
+  labs(y="Monthly precipitation (mm)", x="Month", title="EPA Research Meadow 1989-2020 summer precipitation", 
+       subtitle="Black dot is mean July precipitation 1989-2006", color="Data filling") + theme(legend.position = "top")
+
+monthly_all %>% filter(mo %in% 5:9) %>% ggplot(aes(x=yr, color=factor(mo), group=mo, shape=ifelse(yr>=2018, "study period (filled)", ifelse(yr>=2012,"filled from billy's NOAA data","original EPA data")), y=EPA_NOAA_filled)) +
+  geom_vline(xintercept=2011.5) +geom_point() + geom_smooth(se=F, span=0.7) + 
+  scale_shape_manual(values=c(1,2,19)) + scale_y_continuous(limits=c(0,100))+
+  labs(x="Year",y="EPA Research Meadow monthly precipitation (mm)", color="Month", shape="Data filling") + 
+  geom_segment(data=monthly_all %>% filter(mo %in% 5:9, yr <= 2007) %>% 
+                 group_by(mo) %>% summarize(mean_precip=mean(EPA_NOAA_filled)), 
+               aes(x=1989, xend=2006, y=mean_precip, yend=mean_precip, color=factor(mo)), inherit.aes=F, size=1) 
+```
+
+# Precipitation trends
+
+```{r precip_trend}
+daily_all %>% filter(year(date)>1989, year(date)<2021) %>%
+  mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>%
+  group_by(julian, decade) %>% 
+  summarize(EPA_NOAA_filled = mean(EPA_NOAA_filled, na.rm=T), ground_covered=mean(as.integer(ground_covered), na.rm=T)-1) %>% 
+  ggplot(aes(y=EPA_NOAA_filled, x=julian, color=decade)) + 
+  geom_smooth(span=0.15, se=F)+  geom_point(shape=1, alpha=0.5) +   geom_line(aes(y=ground_covered*2), size=0.75) + 
+  labs(x="Day of year", y="Mean EPA/NOAA precipiation (mm)", color="Decade", title="Snowmelt and monsoon timing by decade") +
+    scale_color_brewer(palette = "Set1", direction = -1) + theme_minimal()
+
+daily_all %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr", EPA_NOAA_filled > 0) %>%   
+  mutate(decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>% group_by(decade) %>% 
+  ggplot(aes(x=EPA_NOAA_filled, color=decade)) + geom_density() +
+    labs(x="EPA/NOAA precipiation (mm)", y="Proportion", color="Decade", title="Intensity spectrum of summer rainstorms > 0 mm") +
+      scale_color_brewer(palette = "Set1", direction = -1) + 
+  scale_x_continuous(breaks=scales::breaks_extended(10)) + theme_minimal()
+
+summary_EPA_NOAA <- daily_all %>% filter(year(date)>1989, year(date)<2021, EPA_NOAA_filled > 2) %>% 
+  mutate(drought_days = c(0,diff(date)), year=year(date)) %>% filter(ground_covered=="smmr") %>% 
+  select(year, date, drought_days) %>% group_by(year) %>% summarize(max_drought_days_2mm = max(drought_days)) %>% 
+  left_join(daily_all %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr") %>% group_by(year=year(date)) %>% 
+              summarize(rain_days_2mm = sum(EPA_NOAA_filled > 2, na.rm=T),
+                        max_precip_mm = max(EPA_NOAA_filled, na.rm=T),
+                        total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
+
+summary_names <- c(max_drought_days_2mm="Longest drought (< 2 mm precipitation)", 
+                   rain_days_2mm = "Rain days (> 2 mm precipitation)",
+                   max_precip_mm = "Maximum daily precipitation (mm)",
+                   total_precip_mm = "Total precipitation (mm)")
+
+ggplot(summary_EPA_NOAA %>% pivot_longer(!year), aes(y=value, x=year))+ 
+  facet_wrap(vars(name), scales="free_y", labeller=as_labeller(summary_names)) +
+  geom_smooth(method="lm", color="black", se=F) + geom_point() + labs(x="Year", y="") + 
+  theme_bw() +theme(text=element_text(color="black", size=14), axis.text = element_text(color="black"),
+                            axis.title.y= element_blank(), strip.background = element_blank())
+```
+
+# Crested Butte precipitation trend
+```{r precip_trend_long}
+ggplot(daily_NOAA, aes(x=date, y=NOAA_stations_name[id], color=prcp_mm)) + geom_tile() 
+ggplot(daily_NOAA, aes(x=date, y=NOAA_stations_name[id], color=tmax_C)) + geom_tile()+ scale_color_viridis_c(option="inferno")
+ggplot(daily_WRCC, aes(x=date, y=id, color=av_temp_2m_C)) + geom_tile() + scale_color_viridis_c(option="inferno")
+
+#weird long run of high precipitation in Sept 1927
+daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, year(date)!=1927) %>%
+  mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>%
+  group_by(julian, decade) %>% summarize(prcp_mm = mean(prcp_mm, na.rm=T)) %>% 
+  ggplot(aes(y=prcp_mm, x=julian, color=decade)) + geom_smooth(span=0.15, se=F)+
+  labs(x="Day of year", y="Mean Crested Butte precipiation (mm)", color="Decade", title="Snowmelt and monsoon timing by decade") +
+  scale_color_viridis_d(option="inferno") + coord_cartesian(xlim=c(120,270)) + theme_dark()
+
+daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, year(date)!=1927,yday(date)>=120, yday(date)<= 270, prcp_mm > 0) %>%
+  mutate(decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>% group_by(decade) %>% 
+  ggplot(aes(x=prcp_mm, color=decade)) + geom_density() +
+    labs(x="Crested Butte precipiation (mm)", y="Proportion", color="Decade", 
+         title="Intensity spectrum of rainstorms > 0 mm \n(day 120-270, Crested Butte)") +
+    scale_color_viridis_d(option="inferno") +  coord_cartesian(xlim=c(0,40)) +  theme_dark()
+
+daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, year(date)!=1927,prcp_mm > 2) %>%
+  mutate(drought_days = c(0,diff(date)), year=year(date)) %>% filter(yday(date)>=120, yday(date)<= 270,) %>% 
+  select(year, date, drought_days) %>% group_by(year) %>% summarize(max_drought_days = max(drought_days)) %>% 
+  ggplot(aes(x= year, y=max_drought_days)) + geom_smooth(span=0.5) +geom_point() +
+  labs(x="Year", y="Consecutive drought days with < 2 mm daily precipitation \n(day 120-270, Crested Butte)")
+
+daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, year(date)!=1927,yday(date)>=120, yday(date)<= 270, prcp_mm > 2) %>% 
+  count(year=year(date)) %>% 
+    ggplot(aes(x= year, y=n)) + geom_smooth(span=0.5) + geom_point() + 
+  labs(x="Year", y="Days with > 2 mm daily precipitation (day 120-270, Crested Butte)")
+
+daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, year(date)!=1927, yday(date)>=120, yday(date)<= 270) %>% 
+  group_by(year=year(date)) %>% summarize(total_mm=sum(prcp_mm, na.rm=T)) %>% 
+    ggplot(aes(x= year, y=total_mm)) + geom_smooth(span=0.5) + geom_point() + 
+  labs(x="Year", y="Total precipitation (mm, day 120-270, Crested Butte)")
+
+daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, yday(date)>=120, yday(date)<= 270) %>% 
+  group_by(year=year(date)) %>% summarize(tmax_mean=mean(tmax_C, na.rm=T)) %>% 
+    ggplot(aes(x= year, y=tmax_mean)) + geom_smooth(span=0.3) + geom_point() + 
+  labs(x="Year", y="Average maximum temperature (C, day 120-270, Crested Butte)")
+
+daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, yday(date)>=120, yday(date)<= 270) %>% 
+  group_by(year=year(date)) %>% summarize(tmin_mean=mean(tmin_C, na.rm=T)) %>% 
+    ggplot(aes(x= year, y=tmin_mean)) + geom_smooth(span=0.3) + geom_point() + 
+  labs(x="Year", y="Average minimum temperature (C, day 120-270, Crested Butte)")
+```
+
+# Snowmelt timing
+
+```{r groundcover}
+groundcover %>% mutate(first_snow_day=first_snow_day-365) %>% 
+  pivot_longer(ends_with("day"), names_to="threshold", values_to="day") %>% drop_na(day) %>% select(-starts_with("first")) %>% 
+  mutate(threshold = fct_reorder(factor(threshold),day, na.rm=T, .desc=T)) %>% 
+  ggplot(aes(x=year, y=day, color=threshold)) +  
+  geom_line(aes(group=year), size=2)+ geom_smooth( method="lm", se=F) +geom_point() +
+  scale_x_continuous(minor_breaks = 1976:2020, position = "top") + scale_y_continuous(n.breaks=10)+
+  scale_color_grey(labels=function(x) str_to_sentence(str_replace_all(x, "_", " ")), start=0, end=0.85) +
+  labs(x="Year", y="Day of year", color="Threshold") + theme_minimal()
+```

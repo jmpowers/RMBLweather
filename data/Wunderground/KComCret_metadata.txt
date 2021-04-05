@@ -1,0 +1,94 @@
+Metadata
+5 min timesteps fileName 2011_2020_KComCret_5min_Measured_QAQC.txt
+15 minute timesteps fileName 2011_2020_KComCret_15min_Measured_QAQC.txt
+30 minute timesteps fileName 2011_2020_KComCret_30min_Measured_QAQC.txt
+1 hour timesteps fileName 2011_2020_KComCret_60min_Measured_QAQC.txt
+
+Measured Variables from the KCOMKRET2 WeatherUndergound weather station, all QAQC'd and gap-filled
+
+dateTime = date and time in local Mountain Time
+TempC = temperature in Degrees celcius, sensor measured
+DewPointC = Dew point in degrees celcius, sensor measured
+HumidityPerc = relative humidity %, sensor measured
+WindSpeed = windspeed in meters per sec m/s, sensor measured
+WindGust = windgust speed in meters per sec m/s, sensor measured
+mmHg = altitude corrected atmospheric pressure in mmHg (altitude of 9000 ft)
+PrecipRate = qaqc'd precipitation rate in mm/min, values corrected based on cumulative data (based on PrecipAccum). For the hourly timesteps, PrecipRate units are mm/hour
+PrecipAccum = daily cumulative precipitation in mm, cumulative sum at each timestep, sensor measured
+UV = UV index, sensor measured (begins on Feb. 1, 2012)
+Rad = incoming downward shortwave radiation watts/meter squared W/m2, sensor measured (begins on Feb. 1, 2012)
+u = u or x (E-W) componenet of the windspeed m/s, sensor measured
+v = v or y (N-S) component of the windspeed m/s, sensor measured
+date = date only
+time = time only in local Mountain time
+DOY = day of year
+Year = year
+month = numerical month
+mon = Alphabetic month
+day = day of month
+hour = hour of the day
+
+
+Modeled Reference ET FAO Penman-Monteith equation for reference evapotranspiration
+See the R Function evapotransHourly.R and evapotransDaily.R for calculations, equations, and citations at hourly and daily timescales
+Constants
+Latitude = 38.8
+Albedo = 0.23
+Elevation = 9500 ft
+
+Hourly: 2011_2020_KComCret_60min_ETModeled.txt
+dateTime = date and time in local Mountain time
+ETrefHour = reference evapotranspiration rate mm/hour
+Precip = precipitation  rate mm/hour
+RadMax - hourly maximum incoming shortwave solar radiation based on latitude and day of year MJ/m2/hr (modeled)
+Rad - hourly measured incoming shortwave solar radiation based on latitude and day of year W/m2 (measured)
+Rs = hourly incoming shortwave solar radiation MJ/m2/hour (measured from Rad and gap-filled with RadMax and cloud cover implemented on rainy days)
+Temp = hourly temperatre in deg C (measured)
+RH = hourly humidity in percent % (measured)
+FF = hourly windspeed m/s (measured)
+doy = decimal day and hour of the year
+hr = hour of the day
+Rns = net downward shortwave radiation MJ/m2/hour (modeled)
+Rso = clear sky solar radiation MJ/m2/hour (modeled)
+Rnlin = downward longwave radiation MJ/m2/hour (modeled)
+Rnlout = upward longwave radiation MJ/m2/hour (modeled)
+Rnetl = net longwave radiation MJ/m2/hour (modeled)
+eRad = extraterrestrial radiation MJ/m2/hour (modeled)
+
+Daily:  2011_2020_KComCret_1day_ETModeled.txt
+dateTime = date and time in local Mountain time
+ETrefHour = hourly reference evapotranspiration rate mm/hour
+Precip = precipitation  rate mm/hour
+RadMax - hourly maximum incoming shortwave solar radiation based on latitude and day of year MJ/m2/hr (modeled)
+Rad - hourly measured incoming shortwave solar radiation based on latitude and day of year W/m2 (measured)
+Rs = hourly incoming shortwave solar radiation MJ/m2/hour (measured from Rad and gap-filled with RadMax and cloud cover implemented on rainy days)
+Temp = hourly temperatre in deg C (measured)
+RH = hourly humidity in percent % (measured)
+FF = hourly windspeed m/s (measured)
+doy = decimal day and hour of the year
+hr = hour of the day
+Rns = net downward shortwave radiation MJ/m2/hour (modeled)
+Rso = clear sky solar radiation MJ/m2/hour (modeled)
+Rnlin = downward longwave radiation MJ/m2/hour (modeled)
+Rnlout = upward longwave radiation MJ/m2/hour (modeled)
+Rnetl = net longwave radiation MJ/m2/hour (modeled)
+eRad = extraterrestrial radiation MJ/m2/hour (modeled)
+
+
+Daily Aggregates
+
+date = date
+Tmax = maximum temperature degrees C
+RHmax = maximum humidity %
+Tmin = minimum temperature degrees C
+RHmin = minimum humidity %
+Tmean = mean temperature degrees C
+Umean = mean wind speed mm/s
+RadMean = mean downward shorwave solar radiation MJ/m2/day
+DOY = day of year
+ETref = daily reference evapotranspiration mm/day
+Precip = daily precipitation mm/day
+Year = year
+month = numeric month
+day = numeric day
+mon = alphabetic month

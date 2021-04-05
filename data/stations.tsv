@@ -1,0 +1,6 @@
+source	id	name	latitude	longitude	elevation	state	url
+EPA	GTH161	RsrchMdw	38.95627	-106.98587	2915	CO	https://www3.epa.gov/castnet/site_pages/GTH161.html
+ESSDIVE	KCOMTCRE2	GoldLink	38.915	-106.959	2926	CO	https://doi.org/doi:10.15485/1734790
+WRCC	CORBIL	billy	38.963	-106.993	2917	CO	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corbil
+WRCC	CORJUD	JuddFalls	38.964	-106.984	3004	CO	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corjud
+WRCC	CORKET	KettlePonds	38.942	-106.973	2860	CO	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corket

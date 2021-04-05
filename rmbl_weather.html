@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="John Powers" />
+
+<meta name="date" content="2021-04-02" />
+
+<title>RMBL Weather Data</title>
+
+<script src="libs/header-attrs-2.7/header-attrs.js"></script>
+<script src="libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="libs/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="libs/navigation-1.1/tabsets.js"></script>
+<script src="libs/navigation-1.1/codefolding.js"></script>
+<link href="libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="libs/highlightjs-9.12.0/highlight.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-sm-12 col-md-4 col-lg-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-sm-12 col-md-8 col-lg-9">
+
+
+
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">RMBL Weather Data</h1>
+<h4 class="author"><a href="http://sites.uci.edu/powers/">John Powers</a></h4>
+<h4 class="date">2021-04-02</h4>
+
+</div>
+
+
+<style type="text/css">
+.main-container { max-width: 1000px; margin-left: 0; margin-right: auto; }
+img{ max-width:200%; height: auto; }
+td, th { padding : 6px }
+</style>
+<div id="purpose" class="section level1">
+<h1>Purpose</h1>
+<p>Compile weather records near the Rocky Mountain Biological Laboratory in Gothic, CO and analyze long-term trends in precipitation and temperature.</p>
+<pre class="r"><code>library(tidyverse)
+library(lubridate)
+library(viridis)
+library(GGally)
+library(knitr)
+knitr::opts_chunk$set(comment=&quot;&quot;, cache=T, warning = F, message = F, fig.path = &quot;images_weather/&quot;)</code></pre>
+</div>
+<div id="datasets" class="section level1">
+<h1>Datasets</h1>
+<div id="wrcc" class="section level2">
+<h2>WRCC</h2>
+<p>Weather data from billy barr’s RMBL station in Gothic, CO, USA provided by the Western Regional Climate Center Original (not FPA - unavailable) data from 2009-2021 in metric units Downloaded as xls (which results in a tsv) from <a href="https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corbil" class="uri">https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corbil</a> Columns renamed from WRCC names according to /data/weather/WRCC/weather_wrcc_metadata.csv Flags on each column indicate 0 = raw data, (M)issing data, (E)stimated data, (N)on-measuring time interval, per <a href="https://wrcc.dri.edu/cgi-bin/wea_listex.pl?flags" class="uri">https://wrcc.dri.edu/cgi-bin/wea_listex.pl?flags</a></p>
+<pre class="r"><code>wrcc_metadata &lt;- read_tsv(&quot;data/weather/WRCC/weather_wrcc_metadata.tsv&quot;) %&gt;% mutate(index = row_number(), flag=F)
+wrcc_metadata &lt;- bind_rows(wrcc_metadata, wrcc_metadata %&gt;% select(name_metric, col_type, index) %&gt;% filter(! name_metric %in% c(&quot;date&quot;,&quot;time&quot;)) %&gt;% 
+  mutate(name_metric=paste0(&quot;flag_&quot;,name_metric), col_type=&quot;f&quot;,flag=T)) %&gt;% arrange(index)
+
+tenmin_CORBIL &lt;- read_tsv(&quot;data/weather/WRCC/wrcc_corbil.tsv.gz&quot;, skip = 4, 
+               col_types=paste0(wrcc_metadata$col_type, collapse=&quot;&quot;), col_names=wrcc_metadata$name_metric) %&gt;% 
+  filter(date &gt;= as.Date(&quot;2015-07-01&quot;))#when precip starts to have reasonable values, temp starts 2015-10-01.
+#no missing precip values in CORBIL - may not have been quality checked.
+hourly_CORBIL &lt;- tenmin_CORBIL %&gt;% mutate(hour=hour(time)) %&gt;% group_by(date, hour) %&gt;% summarize(precip_mm = sum(precip_mm), av_temp_2m_C=mean(av_temp_2m_C)) #take the mean of the precip rate per hour that is reported every 10 min
+daily_CORBIL &lt;- hourly_CORBIL %&gt;% group_by(date) %&gt;% 
+  summarize(precip_mm = sum(precip_mm), #sum the hourly precip rates over each 24 hrs 
+            av_temp_2m_C=mean(av_temp_2m_C), max_temp_2m_C = max(av_temp_2m_C), min_temp_2m_C = min(av_temp_2m_C)) %&gt;% 
+  mutate(year=factor(year(date)), julian=yday(date),
+         precip_mm = ifelse(precip_mm&gt;50, NA, precip_mm)) #cut errors &gt;50mm/day from daily_CORBIL
+
+# Other data (no precip) for Kettle Ponds S of Gothic, CO and Judd Falls E of Gothic, CO</code></pre>
+</div>
+<div id="wunderground" class="section level2">
+<h2>Wunderground</h2>
+<p>Weather data from Gold Link station in Mt. Crested Butte. Michelle Newcomer and David Brian Rogers. 2020. Gap-filled meteorological data (2011-2020) and modeled potential evapotranspiration data from the KCOMTCRE2 WeatherUnderground weather station, from the East River Watershed, Colorado. ESS-DIVE: Deep Insight for Earth Science Data. <a href="doi:10.15485/1734790" class="uri">doi:10.15485/1734790</a>, version: ess-dive-ce2fd798f9d81f5-20201210T030125380.</p>
+<pre class="r"><code>daily_KCOMTCRE2 &lt;- read_csv(&quot;data/weather/Wunderground/2011_2020_KComCret_1day_ETModeled.csv&quot;)</code></pre>
+</div>
+<div id="epa-castnet" class="section level2">
+<h2>EPA CASTNET</h2>
+<p>Weather data from EPA CASTNET GTH161 station, Gothic Research Meadow <a href="https://www3.epa.gov/castnet/site_pages/GTH161.html" class="uri">https://www3.epa.gov/castnet/site_pages/GTH161.html</a> Precip data is missing after 2011</p>
+<pre class="r"><code>hourly_GTH161 &lt;- read_csv(&quot;data/weather/EPA_CASTNET/CASTNET_GTH161_Meteorological_Hourly.csv.gz&quot;, 
+                          col_types=cols(DATE_TIME=col_datetime(&quot;%m/%d/%Y %H:%M:%S&quot;), QA_CODE=col_character()))
+daily_GTH161 &lt;- hourly_GTH161 %&gt;% mutate(date = date(DATE_TIME)) %&gt;% filter(year(date) &lt; 2012) %&gt;% group_by(date) %&gt;% 
+  summarize(TEMPERATURE=mean(TEMPERATURE, na.rm=T), PRECIPITATION = sum(PRECIPITATION, na.rm=T)) #TODO this keeps precip sums when there is missing data, including an entire day!</code></pre>
+</div>
+<div id="noaa" class="section level2">
+<h2>NOAA</h2>
+<p>Includes Crested Butte, Schofield Pass, and billy barr’s station in Gothic, and more. <a href="https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail" class="uri">https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail</a></p>
+<pre class="r"><code>library(rnoaa)
+station_data &lt;- ghcnd_stations()# long download unless cached
+maxfield_coords &lt;- data.frame(id = &quot;RMBL&quot;, latitude = 38.9495, longitude = -106.9908)
+(NOAA_stations &lt;- meteo_nearby_stations(lat_lon_df = maxfield_coords, station_data = station_data,
+                      radius = 10, var = c(&quot;PRCP&quot;, &quot;TAVG&quot;))$RMBL %&gt;% #stations within 10 km radius
+    left_join(station_data %&gt;% filter(element==&quot;PRCP&quot;)))</code></pre>
+<pre><code># A tibble: 7 x 12
+  id      name       latitude longitude distance elevation state gsn_flag wmo_id
+  &lt;chr&gt;   &lt;chr&gt;         &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;     &lt;dbl&gt; &lt;chr&gt; &lt;chr&gt;    &lt;chr&gt; 
+1 US1COG… CRESTED B…     39.0     -107.     1.20     2928. CO    &quot;&quot;       &quot;&quot;    
+2 US1COG… MOUNT CRE…     38.9     -107.     5.01     2941  CO    &quot;&quot;       &quot;&quot;    
+3 US1COG… CRESTED B…     38.9     -107.     6.39     2822. CO    &quot;&quot;       &quot;&quot;    
+4 USS000… Butte          38.9     -107.     7.50     3097. CO    &quot;&quot;       &quot;&quot;    
+5 USC000… CRESTED B…     38.9     -107.     8.49     2703. CO    &quot;&quot;       &quot;&quot;    
+6 US1COG… CRESTED B…     38.9     -107.     8.67     2706  CO    &quot;&quot;       &quot;&quot;    
+7 USS000… Schofield…     39.0     -107.     9.36     3261. CO    &quot;&quot;       &quot;&quot;    
+# … with 3 more variables: element &lt;chr&gt;, first_year &lt;int&gt;, last_year &lt;int&gt;</code></pre>
+<pre class="r"><code>remove(station_data)
+NOAA_stations_name &lt;- with(NOAA_stations, set_names(name, id))
+
+daily_NOAA &lt;- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %&gt;% 
+  mutate(across(contains(&quot;flag&quot;), as.factor)) %&gt;% #All units are in tenths of mm, converted to mm here.
+  mutate(across(c(&quot;prcp&quot;,&quot;snow&quot;,&quot;snwd&quot;,&quot;wesd&quot;,&quot;wesf&quot;), ~ as.integer(.x)/10, .names=&quot;{.col}_mm&quot;), .keep=&quot;unused&quot;) %&gt;% 
+  mutate(across(c(&quot;tmin&quot;,&quot;tavg&quot;,&quot;tmax&quot;), ~ as.integer(.x)/10, .names=&quot;{.col}_C&quot;), .keep=&quot;unused&quot;) %&gt;% 
+  mutate(date = date - days(1)) # comparison of other 3 stations shows at least the US1COGN0018 precip is recorded the next day</code></pre>
+</div>
+<div id="ncei" class="section level2">
+<h2>NCEI</h2>
+<p>Global Surface Summary of the Day (‘GSOD’) weather data from the from the USA National Centers for Environmental Information (‘NCEI’). <a href="https://www1.ncdc.noaa.gov/pub/data/gsod/readme.txt" class="uri">https://www1.ncdc.noaa.gov/pub/data/gsod/readme.txt</a> <a href="https://www1.ncdc.noaa.gov/pub/data/noaa/isd-inventory.txt" class="uri">https://www1.ncdc.noaa.gov/pub/data/noaa/isd-inventory.txt</a> Only get Gunnison/Crested Butte and Aspen airports - 50 km away from Gothic</p>
+<pre class="r"><code>library(GSODR)
+gsodr.inventory &lt;- get_inventory() %&gt;% #long download
+  filter(STNID %in% nearest_stations(38.9495, -106.9908,50))</code></pre>
+</div>
+<div id="gothicwx" class="section level2">
+<h2>gothicwx</h2>
+<p>billy barr’s snow records from gothicwx.org</p>
+<pre class="r"><code>groundcover &lt;- read_tsv(&quot;./data/weather/gothicwx/groundcover.tsv&quot;) %&gt;% 
+  mutate(across(starts_with(&quot;first&quot;), list(day=yday)), year=year(first_0_cm))
+
+first_snow_2020 &lt;- as.POSIXct(c(&quot;2020-10-25&quot;, &quot;2020-12-31&quot;), tz=&quot;UTC&quot;) #TODO check this first permanent snow of 2020 (not yet on billy&#39;s website)</code></pre>
+</div>
+<div id="combine-datasets" class="section level2">
+<h2>Combine datasets</h2>
+<pre class="r"><code>#Combine weather station data in long format
+daily_long &lt;- bind_rows( 
+  GTH161 = hourly_GTH161 %&gt;% arrange(DATE_TIME) %&gt;% mutate(date = date(DATE_TIME)) %&gt;% group_by(date) %&gt;% 
+    summarize(tavg_C=mean(TEMPERATURE), tmax_C=max(TEMPERATURE), tmin_C=min(TEMPERATURE),       #NA if missing any temperatures,
+              prcp_mm = ifelse(sum(is.na(PRECIPITATION))==0, sum(PRECIPITATION, na.rm=T), NA)), #or any precip (unlike day_GTH161)
+  KCOMTCRE2 = daily_KCOMTCRE2 %&gt;% select(date, tavg_C = Tmean, tmax_C = Tmax, tmin_C = Tmin, prcp_mm = Precip),
+  CORBIL= daily_CORBIL %&gt;% select(date, tavg_C = av_temp_2m_C, tmax_C = max_temp_2m_C, tmin_C = min_temp_2m_C, prcp_mm = precip_mm), #curiously, no NAs
+  .id=&quot;id&quot;) %&gt;% bind_rows(daily_NOAA %&gt;% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %&gt;% mutate(id=factor(id))
+
+#Combine weather station data in wide format
+stations &lt;- c(GTH161=&quot;EPA_RsrchMdw&quot;,KCOMTCRE2=&quot;ESSDIVE_GoldLink&quot;,CORBIL=&quot;WRCC_billy&quot;,billy=&quot;NOAA_billy&quot;)#station=&quot;source_location&quot;
+daily_all &lt;- daily_NOAA %&gt;% filter(id == &quot;US1COGN0018&quot;) %&gt;% 
+  full_join(daily_GTH161) %&gt;% full_join(daily_KCOMTCRE2) %&gt;% full_join(daily_CORBIL) %&gt;% 
+  rename(EPA_RsrchMdw=PRECIPITATION, ESSDIVE_GoldLink=Precip, WRCC_billy=precip_mm, NOAA_billy=prcp_mm) %&gt;% 
+  mutate(yr = year(date), mo = month(date, label=F),
+         ground_covered = factor(c(&quot;smmr&quot;,&quot;wntr&quot;))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by=&quot;day&quot;)))]) 
+
+#correlate daily EPA_RsrchMdw and NOAA_billy to predict what EPA would look like for 2012-2020
+EPA_NOAA_daily_model &lt;-  lm(EPA_RsrchMdw ~ NOAA_billy:ground_covered+0, data=daily_all)
+#EPA_NOAA_monthly_model &lt;-lm(EPA_RsrchMdw ~ NOAA_billy*season, data=monthly_all %&gt;% 
+#mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]))
+daily_all &lt;- daily_all %&gt;% 
+  mutate(EPA_predicted = is.na(EPA_RsrchMdw) &amp; !is.na(NOAA_billy),
+         EPA_NOAA_filled = ifelse(is.na(EPA_RsrchMdw), predict(EPA_NOAA_daily_model, newdata=daily_all), EPA_RsrchMdw),)
+stations &lt;- c(&quot;EPA_NOAA_filled&quot;, stations)
+monthly_all &lt;- daily_all %&gt;% group_by(yr, mo) %&gt;% 
+  summarize(across(unname(stations), ~ ifelse(sum(is.na(.x))&gt;5, NA, sum(.x, na.rm=T))), .groups=&quot;drop&quot;) %&gt;% arrange(yr, mo) 
+
+save(daily_all, file=&quot;data/weather/rmbl_weather.rda&quot;)</code></pre>
+</div>
+</div>
+<div id="daily-weather" class="section level1">
+<h1>Daily weather</h1>
+<pre class="r"><code>ggplot(daily_all %&gt;% filter(year(date) %in% 2018:2020), aes(y=EPA_NOAA_filled, x=yday(date))) + geom_col(aes(fill=ground_covered)) + 
+  facet_wrap(vars(year(date)), ncol=1) + labs(x=&quot;Day of year&quot;, y=&quot;EPA/NOAA precipiation (mm)&quot;, fill=&quot;Snow cover&quot;)</code></pre>
+<p><img src="images_weather/weather_daily-1.png" width="672" /></p>
+<pre class="r"><code>daily_all %&gt;% pivot_longer(unname(stations), names_to=&quot;station&quot;, values_to=&quot;precipitation_mm&quot;) %&gt;% 
+  filter(yday(date) &gt;100, yday(date) &lt; 240, year(date) %in% 2018:2020) %&gt;%
+  ggplot(aes(x=yday(date), y=precipitation_mm, color=station, shape=ground_covered)) +  
+  geom_line() +  geom_point() + facet_wrap(vars(year), ncol=1) + theme(legend.position = &quot;top&quot;, legend.direction=&quot;vertical&quot;) +
+  labs(x=&quot;Day of year&quot;, y = &quot;Precipitation (mm)&quot;, color=&quot;Station&quot;, shape=&quot;Snow cover&quot;)</code></pre>
+<p><img src="images_weather/weather_daily-2.png" width="672" /></p>
+<pre class="r"><code>precip_max &lt;- 50
+lower_continuous &lt;- function (data, mapping, ...) {
+    ggally_smooth(data = data, mapping = mapping, ..., method = &quot;loess&quot;) + scale_shape_manual(values=c(1,2))+
+    coord_cartesian(xlim=c(0,precip_max), ylim=c(0,precip_max)) + geom_abline(slope=1, intercept=0)+
+    scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))+scale_y_continuous(breaks=seq(0,precip_max, by=precip_max/5))
+}
+lower_combo &lt;- function (data, mapping, ...) {
+    ggally_facethist(data = data, mapping = mapping, binwidth=precip_max/50,...) +
+    coord_cartesian(xlim=c(0,precip_max)) + scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))
+}
+ggpairs(daily_all %&gt;% select(all_of(unname(stations[-1])), ground_covered), mapping=aes(color=ground_covered,shape=ground_covered), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))</code></pre>
+<p><img src="images_weather/weather_daily-3.png" width="672" /></p>
+<pre class="r"><code>filter(daily_all) %&gt;% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Snow cover&quot;)</code></pre>
+<p><img src="images_weather/weather_daily-4.png" width="672" /></p>
+</div>
+<div id="monthly-weather" class="section level1">
+<h1>Monthly weather</h1>
+<pre class="r"><code>#recalculate Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station
+(EPA_89_06_July_avg_mm &lt;- monthly_all %&gt;% filter(mo==7, yr &gt;= 1989, yr &lt;= 2006) %&gt;% pull(EPA_NOAA_filled) %&gt;% mean)</code></pre>
+<pre><code>[1] 53.70822</code></pre>
+<pre class="r"><code>(water_addition_per_month_mm &lt;- (14 / 4 / 2) * 31) #14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July</code></pre>
+<pre><code>[1] 54.25</code></pre>
+<pre class="r"><code>monthly_all %&gt;% pivot_longer(unname(stations), names_to=&quot;station&quot;, values_to=&quot;precipitation_mm&quot;) %&gt;% 
+ggplot(aes(x=mo*30.4-15.2, y=precipitation_mm, color=station)) + facet_wrap(vars(yr)) + #place points at month midpoint
+  #geom_rect(data=waterdates %&gt;% pivot_wider(names_from=precip_treatments, values_from=c(day, date)) %&gt;% mutate(yr=factor(year)), 
+  #          aes(xmin=day_started, xmax=day_ended, ymin=0, ymax=water_addition_per_month_mm), inherit.aes=F,
+  #          fill=water_pal[&quot;Addition&quot;])+
+  geom_line() +  geom_point()+
+  geom_point(data=groundcover %&gt;% filter(year&gt;=2004) %&gt;% mutate(yr=factor(year)), aes(x=first_0_cm_day,y=0), inherit.aes=F)+
+  geom_point(data=groundcover %&gt;% filter(year&gt;=2005) %&gt;% mutate(yr=factor(year-1)), aes(x=first_snow_day,y=0), inherit.aes=F)+
+  labs(y=&quot;Monthly precipitation (mm)&quot;, x=&quot;Day of the year, with snowmelt and first snow dates&quot;, color=&quot;Station&quot;) +
+  theme(legend.position=&quot;top&quot;) + coord_cartesian(ylim=c(0,200))</code></pre>
+<p><img src="images_weather/weather_monthly-1.png" width="672" /></p>
+<pre class="r"><code>precip_max &lt;- 250
+ggpairs(monthly_all %&gt;% mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]) %&gt;% select(all_of(unname(stations[-1])), season), mapping=aes(color=season,shape=season), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))</code></pre>
+<p><img src="images_weather/weather_monthly-2.png" width="672" /></p>
+<pre class="r"><code>filter(monthly_all) %&gt;% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ifelse(mo %in% 6:9,mo,&quot;Oct - May&quot;))) + geom_point() + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Month&quot;)</code></pre>
+<p><img src="images_weather/weather_monthly-3.png" width="672" /></p>
+<pre class="r"><code>monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% 
+  ggplot(aes(x=mo,  y=EPA_NOAA_filled)) + geom_smooth(span=0.5, color=&quot;black&quot;) +
+  geom_line(aes(color=ifelse(yr&gt;=2018, &quot;study period (filled)&quot;, ifelse(yr&gt;=2012,&quot;filled from billy&#39;s NOAA data&quot;,&quot;original EPA data&quot;)), group=yr)) +
+  geom_point(x=7, y=EPA_89_06_July_avg_mm)+ scale_y_continuous(limits=c(0,100))+
+  geom_text(aes(label=ifelse(yr&gt;=2018, yr, &quot;&quot;)))  + 
+  labs(y=&quot;Monthly precipitation (mm)&quot;, x=&quot;Month&quot;, title=&quot;EPA Research Meadow 1989-2020 summer precipitation&quot;, 
+       subtitle=&quot;Black dot is mean July precipitation 1989-2006&quot;, color=&quot;Data filling&quot;) + theme(legend.position = &quot;top&quot;)</code></pre>
+<p><img src="images_weather/weather_monthly-4.png" width="672" /></p>
+<pre class="r"><code>monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% ggplot(aes(x=yr, color=factor(mo), group=mo, shape=ifelse(yr&gt;=2018, &quot;study period (filled)&quot;, ifelse(yr&gt;=2012,&quot;filled from billy&#39;s NOAA data&quot;,&quot;original EPA data&quot;)), y=EPA_NOAA_filled)) +
+  geom_vline(xintercept=2011.5) +geom_point() + geom_smooth(se=F, span=0.7) + 
+  scale_shape_manual(values=c(1,2,19)) + scale_y_continuous(limits=c(0,100))+
+  labs(x=&quot;Year&quot;,y=&quot;EPA Research Meadow monthly precipitation (mm)&quot;, color=&quot;Month&quot;, shape=&quot;Data filling&quot;) + 
+  geom_segment(data=monthly_all %&gt;% filter(mo %in% 5:9, yr &lt;= 2007) %&gt;% 
+                 group_by(mo) %&gt;% summarize(mean_precip=mean(EPA_NOAA_filled)), 
+               aes(x=1989, xend=2006, y=mean_precip, yend=mean_precip, color=factor(mo)), inherit.aes=F, size=1) </code></pre>
+<p><img src="images_weather/weather_monthly-5.png" width="672" /></p>
+</div>
+<div id="precipitation-trends" class="section level1">
+<h1>Precipitation trends</h1>
+<pre class="r"><code>daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021) %&gt;%
+  mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, &quot;2020&quot;=&quot;2010&quot;)) %&gt;%
+  group_by(julian, decade) %&gt;% 
+  summarize(EPA_NOAA_filled = mean(EPA_NOAA_filled, na.rm=T), ground_covered=mean(as.integer(ground_covered), na.rm=T)-1) %&gt;% 
+  ggplot(aes(y=EPA_NOAA_filled, x=julian, color=decade)) + 
+  geom_smooth(span=0.15, se=F)+  geom_point(shape=1, alpha=0.5) +   geom_line(aes(y=ground_covered*2), size=0.75) + 
+  labs(x=&quot;Day of year&quot;, y=&quot;Mean EPA/NOAA precipiation (mm)&quot;, color=&quot;Decade&quot;, title=&quot;Snowmelt and monsoon timing by decade&quot;) +
+    scale_color_brewer(palette = &quot;Set1&quot;, direction = -1) + theme_minimal()</code></pre>
+<p><img src="images_weather/precip_trend-1.png" width="672" /></p>
+<pre class="r"><code>daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, ground_covered==&quot;smmr&quot;, EPA_NOAA_filled &gt; 0) %&gt;%   
+  mutate(decade = factor(floor(year(date)/10)*10), decade = recode(decade, &quot;2020&quot;=&quot;2010&quot;)) %&gt;% group_by(decade) %&gt;% 
+  ggplot(aes(x=EPA_NOAA_filled, color=decade)) + geom_density() +
+    labs(x=&quot;EPA/NOAA precipiation (mm)&quot;, y=&quot;Proportion&quot;, color=&quot;Decade&quot;, title=&quot;Intensity spectrum of summer rainstorms &gt; 0 mm&quot;) +
+      scale_color_brewer(palette = &quot;Set1&quot;, direction = -1) + 
+  scale_x_continuous(breaks=scales::breaks_extended(10)) + theme_minimal()</code></pre>
+<p><img src="images_weather/precip_trend-2.png" width="672" /></p>
+<pre class="r"><code>summary_EPA_NOAA &lt;- daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, EPA_NOAA_filled &gt; 2) %&gt;% 
+  mutate(drought_days = c(0,diff(date)), year=year(date)) %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% 
+  select(year, date, drought_days) %&gt;% group_by(year) %&gt;% summarize(max_drought_days_2mm = max(drought_days)) %&gt;% 
+  left_join(daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, ground_covered==&quot;smmr&quot;) %&gt;% group_by(year=year(date)) %&gt;% 
+              summarize(rain_days_2mm = sum(EPA_NOAA_filled &gt; 2, na.rm=T),
+                        max_precip_mm = max(EPA_NOAA_filled, na.rm=T),
+                        total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
+
+summary_names &lt;- c(max_drought_days_2mm=&quot;Longest drought (&lt; 2 mm precipitation)&quot;, 
+                   rain_days_2mm = &quot;Rain days (&gt; 2 mm precipitation)&quot;,
+                   max_precip_mm = &quot;Maximum daily precipitation (mm)&quot;,
+                   total_precip_mm = &quot;Total precipitation (mm)&quot;)
+
+ggplot(summary_EPA_NOAA %&gt;% pivot_longer(!year), aes(y=value, x=year))+ 
+  facet_wrap(vars(name), scales=&quot;free_y&quot;, labeller=as_labeller(summary_names)) +
+  geom_smooth(method=&quot;lm&quot;, color=&quot;black&quot;, se=F) + geom_point() + labs(x=&quot;Year&quot;, y=&quot;&quot;) + 
+  theme_bw() +theme(text=element_text(color=&quot;black&quot;, size=14), axis.text = element_text(color=&quot;black&quot;),
+                            axis.title.y= element_blank(), strip.background = element_blank())</code></pre>
+<p><img src="images_weather/precip_trend-3.png" width="672" /></p>
+</div>
+<div id="crested-butte-precipitation-trend" class="section level1">
+<h1>Crested Butte precipitation trend</h1>
+<pre class="r"><code>ggplot(daily_NOAA, aes(x=date, y=NOAA_stations_name[id], color=prcp_mm)) + geom_tile() </code></pre>
+<p><img src="images_weather/precip_trend_long-1.png" width="672" /></p>
+<pre class="r"><code>ggplot(daily_NOAA, aes(x=date, y=NOAA_stations_name[id], color=tmax_C)) + geom_tile()+ scale_color_viridis_c(option=&quot;inferno&quot;)</code></pre>
+<p><img src="images_weather/precip_trend_long-2.png" width="672" /></p>
+<pre class="r"><code>#weird long run of high precipitation in Sept 1927
+daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, year(date)!=1927) %&gt;%
+  mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, &quot;2020&quot;=&quot;2010&quot;)) %&gt;%
+  group_by(julian, decade) %&gt;% summarize(prcp_mm = mean(prcp_mm, na.rm=T)) %&gt;% 
+  ggplot(aes(y=prcp_mm, x=julian, color=decade)) + geom_smooth(span=0.15, se=F)+
+  labs(x=&quot;Day of year&quot;, y=&quot;Mean Crested Butte precipiation (mm)&quot;, color=&quot;Decade&quot;, title=&quot;Snowmelt and monsoon timing by decade&quot;) +
+  scale_color_viridis_d(option=&quot;inferno&quot;) + coord_cartesian(xlim=c(120,270)) + theme_dark()</code></pre>
+<p><img src="images_weather/precip_trend_long-3.png" width="672" /></p>
+<pre class="r"><code>daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, year(date)!=1927,yday(date)&gt;=120, yday(date)&lt;= 270, prcp_mm &gt; 0) %&gt;%
+  mutate(decade = factor(floor(year(date)/10)*10), decade = recode(decade, &quot;2020&quot;=&quot;2010&quot;)) %&gt;% group_by(decade) %&gt;% 
+  ggplot(aes(x=prcp_mm, color=decade)) + geom_density() +
+    labs(x=&quot;Crested Butte precipiation (mm)&quot;, y=&quot;Proportion&quot;, color=&quot;Decade&quot;, 
+         title=&quot;Intensity spectrum of rainstorms &gt; 0 mm \n(day 120-270, Crested Butte)&quot;) +
+    scale_color_viridis_d(option=&quot;inferno&quot;) +  coord_cartesian(xlim=c(0,40)) +  theme_dark()</code></pre>
+<p><img src="images_weather/precip_trend_long-4.png" width="672" /></p>
+<pre class="r"><code>daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, year(date)!=1927,prcp_mm &gt; 2) %&gt;%
+  mutate(drought_days = c(0,diff(date)), year=year(date)) %&gt;% filter(yday(date)&gt;=120, yday(date)&lt;= 270,) %&gt;% 
+  select(year, date, drought_days) %&gt;% group_by(year) %&gt;% summarize(max_drought_days = max(drought_days)) %&gt;% 
+  ggplot(aes(x= year, y=max_drought_days)) + geom_smooth(span=0.5) +geom_point() +
+  labs(x=&quot;Year&quot;, y=&quot;Consecutive drought days with &lt; 2 mm daily precipitation \n(day 120-270, Crested Butte)&quot;)</code></pre>
+<p><img src="images_weather/precip_trend_long-5.png" width="672" /></p>
+<pre class="r"><code>daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, year(date)!=1927,yday(date)&gt;=120, yday(date)&lt;= 270, prcp_mm &gt; 2) %&gt;% 
+  count(year=year(date)) %&gt;% 
+    ggplot(aes(x= year, y=n)) + geom_smooth(span=0.5) + geom_point() + 
+  labs(x=&quot;Year&quot;, y=&quot;Days with &gt; 2 mm daily precipitation (day 120-270, Crested Butte)&quot;)</code></pre>
+<p><img src="images_weather/precip_trend_long-6.png" width="672" /></p>
+<pre class="r"><code>daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, year(date)!=1927, yday(date)&gt;=120, yday(date)&lt;= 270) %&gt;% 
+  group_by(year=year(date)) %&gt;% summarize(total_mm=sum(prcp_mm, na.rm=T)) %&gt;% 
+    ggplot(aes(x= year, y=total_mm)) + geom_smooth(span=0.5) + geom_point() + 
+  labs(x=&quot;Year&quot;, y=&quot;Total precipitation (mm, day 120-270, Crested Butte)&quot;)</code></pre>
+<p><img src="images_weather/precip_trend_long-7.png" width="672" /></p>
+<pre class="r"><code>daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, yday(date)&gt;=120, yday(date)&lt;= 270) %&gt;% 
+  group_by(year=year(date)) %&gt;% summarize(tmax_mean=mean(tmax_C, na.rm=T)) %&gt;% 
+    ggplot(aes(x= year, y=tmax_mean)) + geom_smooth(span=0.3) + geom_point() + 
+  labs(x=&quot;Year&quot;, y=&quot;Average maximum temperature (C, day 120-270, Crested Butte)&quot;)</code></pre>
+<p><img src="images_weather/precip_trend_long-8.png" width="672" /></p>
+<pre class="r"><code>daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, yday(date)&gt;=120, yday(date)&lt;= 270) %&gt;% 
+  group_by(year=year(date)) %&gt;% summarize(tmin_mean=mean(tmin_C, na.rm=T)) %&gt;% 
+    ggplot(aes(x= year, y=tmin_mean)) + geom_smooth(span=0.3) + geom_point() + 
+  labs(x=&quot;Year&quot;, y=&quot;Average minimum temperature (C, day 120-270, Crested Butte)&quot;)</code></pre>
+<p><img src="images_weather/precip_trend_long-9.png" width="672" /></p>
+</div>
+<div id="snowmelt-timing" class="section level1">
+<h1>Snowmelt timing</h1>
+<pre class="r"><code>groundcover %&gt;% mutate(first_snow_day=first_snow_day-365) %&gt;% 
+  pivot_longer(ends_with(&quot;day&quot;), names_to=&quot;threshold&quot;, values_to=&quot;day&quot;) %&gt;% drop_na(day) %&gt;% select(-starts_with(&quot;first&quot;)) %&gt;% 
+  mutate(threshold = fct_reorder(factor(threshold),day, na.rm=T, .desc=T)) %&gt;% 
+  ggplot(aes(x=year, y=day, color=threshold)) +  
+  geom_line(aes(group=year), size=2)+ geom_smooth( method=&quot;lm&quot;, se=F) +geom_point() +
+  scale_x_continuous(minor_breaks = 1976:2020, position = &quot;top&quot;) + scale_y_continuous(n.breaks=10)+
+  scale_color_grey(labels=function(x) str_to_sentence(str_replace_all(x, &quot;_&quot;, &quot; &quot;)), start=0, end=0.85) +
+  labs(x=&quot;Year&quot;, y=&quot;Day of year&quot;, color=&quot;Threshold&quot;) + theme_minimal()</code></pre>
+<p><img src="images_weather/groundcover-1.png" width="672" /></p>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

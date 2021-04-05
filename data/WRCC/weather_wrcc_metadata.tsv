@@ -1,0 +1,257 @@
+id	column_noflags	units_metric	description1	description2	name_metric	col_type
+CORBIL	1	:          	:   Date   	:YYYY/MM/DD	date	D
+CORBIL	2	  LST  	 Time  	 hh:mm 	time	t
+CORBIL	3	 W/m2	 Solar 	  Rad. 	solar_rad_Wm2	n
+CORBIL	4	 W/m2	Std dev	Sol.Rad	sd_solar_rad_Wm2	n
+CORBIL	5	 m/s 	  Wind 	  Speed	wind_speed_ms	n
+CORBIL	6	 m/s 	 Wind  	Vec Mag	wind_vec_mag_ms	n
+CORBIL	7	 Deg 	 Wind  	 Direc 	wind_direc_deg	n
+CORBIL	8	 Deg 	Std Dev	Wnd Dir	sd_wind_dir_deg	n
+CORBIL	9	 m/s 	Mx Gust	 Speed 	mx_gust_spd_ms	n
+CORBIL	10	 Deg 	Std Dev	Wnd Spd	sd_wnd_spd_ms	n
+CORBIL	11	 m/s 	  Min  	Wnd Spd	min_wind_spd_ms	n
+CORBIL	12	Deg C	 Mx Air	  Temp 	max_air_temp_C	n
+CORBIL	13	Deg C	 Mn Air	  Temp 	min_air_temp_C	n
+CORBIL	14	Deg C	 Av Air	  Temp 	av_air_temp_C	n
+CORBIL	15	  %  	Mx Rel 	Humidty	max_rel_humidity	n
+CORBIL	16	  %  	Mn Rel 	Humidty	mix_rel_humidity	n
+CORBIL	17	  %  	  Rel  	Humidty	rel_humidity	n
+CORBIL	18	mbar 	 Barom 	 Press 	pressure_mbar	n
+CORBIL	19	 mm  	 Precip	       	precip_mm	n
+CORBIL	20	 mm  	 Accum 	 Pcpn  	accum_precip_mm	n
+CORBIL	21	 mm  	 Snow  	 Depth 	snow_depth_mm	n
+CORBIL	22	  Q  	 SR50 Q	  sig  	sr50_q_sig	n
+CORBIL	23	 mm  	 Snow  	Pillow 	snow_pillow_mm	n
+CORBIL	24	Deg C	  2m   	Mx Temp	max_temp_2m_C	n
+CORBIL	25	Deg C	  2m   	Mn Temp	min_temp_2m_C	n
+CORBIL	26	Deg C	  2m   	Av Temp	av_temp_2m_C	n
+CORBIL	27	Deg C	Max T  	TC 10m 	max_t_tc_10m	n
+CORBIL	28	Deg C	Min T  	TC 10m 	min_t_tc_10m	n
+CORBIL	29	Deg C	Min T  	TC 10m 	min_t_tc_10m_2	n
+CORBIL	30	Deg C	10m-2m 	 Mx dT 	mx_dt_10m_2m	n
+CORBIL	31	Deg C	10m-2m 	 Mn dT 	mn_dt_10m_2m	n
+CORBIL	32	Deg C	10m-2m 	Delta T	delta_t_10m_2m	n
+CORBIL	33	volts	Max Bat	 Volts 	max_battery_V	n
+CORBIL	34	volts	Min Bat	 Volts 	min_battery_V	n
+CORBIL	35	volts	Battery	Voltage	battery_V	n
+CORBIL	36	Deg C	Dat Pan	  Temp 	dat_pan_temp_C	n
+CORBIL	37	     	Station	 Id. # 	station_id	n
+CORJUD	1	:          	:   Date   	:YYYY/MM/DD	date	D
+CORJUD	2	  LST  	 Time  	 hh:mm 	time	t
+CORJUD	3	 W/m2	 Solar 	  Rad. 	solar_rad_Wm2	n
+CORJUD	4	 W/m2	Std dev	Sol.Rad	sd_solar_rad_Wm2	n
+CORJUD	5	 W/m2	  Max  	Solar R	max_solar_rad_Wm2	n
+CORJUD	6	 W/m2	  Min  	Solar R	min_solar_rad_Wm2	n
+CORJUD	7	 m/s 	  Wind 	  Speed	wind_speed_ms	n
+CORJUD	8	 m/s 	 Wind  	Vec Mag	wind_vec_mag_ms	n
+CORJUD	9	 Deg 	 Wind  	 Direc 	wind_direc_deg	n
+CORJUD	10	 Deg 	Std Dev	Wnd Dir	sd_wind_dir_deg	n
+CORJUD	11	 m/s 	Mx Gust	 Speed 	mx_gust_spd_ms	n
+CORJUD	12	 Deg 	Std Dev	Wnd Spd	sd_wnd_spd_ms	n
+CORJUD	13	 m/s 	  Min  	Wnd Spd	min_wind_spd_ms	n
+CORJUD	14	Deg C	 Mx Air	  Temp 	max_air_temp_C	n
+CORJUD	15	Deg C	 Mn Air	  Temp 	min_air_temp_C	n
+CORJUD	16	Deg C	 Av Air	  Temp 	av_air_temp_C	n
+CORJUD	17	  %  	Mx Rel 	Humidty	max_rel_humidity	n
+CORJUD	18	  %  	Mn Rel 	Humidty	mix_rel_humidity	n
+CORJUD	19	  %  	  Rel  	Humidty	rel_humidity	n
+CORJUD	20	mbar 	 Barom 	 Press 	pressure_mbar	n
+CORJUD	21	Deg C	"2"" Soil"	Max Tmp	max_soil_2in_temp_C	n
+CORJUD	22	Deg C	"2"" Soil"	Min Tmp	min_soil_2in_temp_C	n
+CORJUD	23	Deg C	"2"" Soil"	Ave Tmp	av_soil_2in_temp_C	n
+CORJUD	24	Deg C	"10""Soil"	Mx Temp	max_soil_10in_temp_C	n
+CORJUD	25	Deg C	"10""Soil"	Mn Temp	min_soil_10in_temp_C	n
+CORJUD	26	Deg C	"10""Soil"	Av Temp	av_soil_10in_temp_C	n
+CORJUD	27	Deg C	"20""Soil"	Mx Temp	max_soil_20in_temp_C	n
+CORJUD	28	Deg C	"20""Soil"	Mn Temp	min_soil_20in_temp_C	n
+CORJUD	29	Deg C	"20""Soil"	Av Temp	av_soil_20in_temp_C	n
+CORJUD	30	 VWC 	Soil M 	@ 2 in.	VWC_soil_2in	n
+CORJUD	31	 VWC 	Soil M 	@ 10 in	VWC_soil_10in	n
+CORJUD	32	 VWC 	Soil M 	@ 20 in	VWC_soil_20in	n
+CORJUD	33	Deg C	  2m   	Mx Temp	max_temp_2m_C	n
+CORJUD	34	Deg C	  2m   	Mn Temp	min_temp_2m_C	n
+CORJUD	35	Deg C	  2m   	Av Temp	av_temp_2m_C	n
+CORJUD	36	Deg C	Max T  	TC 10m 	max_t_tc_10m	n
+CORJUD	37	Deg C	Min T  	TC 10m 	min_t_tc_10m	n
+CORJUD	38	Deg C	Min T  	TC 10m 	min_t_tc_10m_2	n
+CORJUD	39	Deg C	10m-2m 	 Mx dT 	mx_dt_10m_2m	n
+CORJUD	40	Deg C	10m-2m 	 Mn dT 	mn_dt_10m_2m	n
+CORJUD	41	Deg C	10m-2m 	Delta T	delta_t_10m_2m	n
+CORJUD	42	 VWC 	SM #2  	@ 2 in.	VWC_soil2_2in	n
+CORJUD	43	 VWC 	SM #2  	@ 4 in.	VWC_soil2_4in	n
+CORJUD	44	 VWC 	SM #2  	@ 8 in.	VWC_soil2_8in	n
+CORJUD	45	 VWC 	SM #2  	@ 20 in	VWC_soil2_20in	n
+CORJUD	46	dS/m 	"Soil 2"""	Conduct	conduct_soil_2in	n
+CORJUD	47	dS/m 	"Soil 4"""	Conduct	conduct_soil_4in	n
+CORJUD	48	dS/m 	"Soil 8"""	Conduct	conduct_soil_8in	n
+CORJUD	49	dS/m 	Soil 20	Conduct	conduct_soil_20in	n
+CORJUD	50	Deg C	"2 ""Soil"	Av Tp#2	av_temp_soil2_2in	n
+CORJUD	51	Deg C	"4 ""Soil"	Av Tp#2	av_temp_soil2_4in	n
+CORJUD	52	Deg C	"8 ""Soil"	Av Tp#2	av_temp_soil2_8in	n
+CORJUD	53	Deg C	"20""Soil"	Av Tp#2	av_temp_soil2_20in	n
+CORJUD	54	     	"Soil 2"""	 Perm. 	perm_soil_2in	n
+CORJUD	55	     	"Soil 4"""	 Perm. 	perm_soil_4in	n
+CORJUD	56	     	"Soil 8"""	 Perm. 	perm_soil_8in	n
+CORJUD	57	     	Soil 20	 Perm. 	perm_soil_20in	n
+CORJUD	58	 mm  	 Snow  	 Depth 	snow_depth_mm	n
+CORJUD	59	     	Station	 Id. # 	station_id	n
+CORKET	1	:          	:   Date   	:YYYY/MM/DD	date	D
+CORKET	2	  LST  	 Time  	 hh:mm 	time	t
+CORKET	3	 W/m2	 Solar 	  Rad.	solar_rad_Wm2	n
+CORKET	4	 W/m2	Std dev	Sol.Rad	sd_solar_rad_Wm2	n
+CORKET	5	 W/m2	  Max  	Solar R	max_solar_rad_Wm2	n
+CORKET	6	 W/m2	  Min  	Solar R	min_solar_rad_Wm2	n
+CORKET	7	 m/s 	  Wind 	  Speed	wind_speed_ms	n
+CORKET	8	 m/s 	 Wind  	Vec Mag	wind_vec_mag_ms	n
+CORKET	9	 Deg 	 Wind  	 Direc	wind_direc_deg	n
+CORKET	10	 Deg 	Std Dev	Wnd Dir	sd_wind_dir_deg	n
+CORKET	11	 m/s 	Mx Gust	 Speed	mx_gust_spd_ms	n
+CORKET	12	 Deg 	Std Dev	Wnd Spd	sd_wnd_spd_ms	n
+CORKET	13	 m/s 	  Min  	Wnd Spd	min_wind_spd_ms	n
+CORKET	14	Deg C	 Mx Air	  Temp	max_air_temp_C	n
+CORKET	15	Deg C	 Mn Air	  Temp	min_air_temp_C	n
+CORKET	16	Deg C	 Av Air	  Temp	av_air_temp_C	n
+CORKET	17	  %  	Mx Rel 	Humidty	max_rel_humidity	n
+CORKET	18	  %  	Mn Rel 	Humidty	mix_rel_humidity	n
+CORKET	19	  %  	  Rel  	Humidty	rel_humidity	n
+CORKET	20	mbar 	 Barom 	 Press	pressure_mbar	n
+CORKET	21	 mm  	 Precip	      	precip_mm	n
+CORKET	22	 mm  	 Accum 	 Pcpn 	accum_precip_mm	n
+CORKET	23	 mm  	 Snow  	 Depth	snow_depth_mm	n
+CORKET	24	Deg C	  2m   	Mx Temp	max_temp_2m_C	n
+CORKET	25	Deg C	  2m   	Mn Temp	min_temp_2m_C	n
+CORKET	26	Deg C	  2m   	Av Temp	av_temp_2m_C	n
+CORKET	27	Deg C	Max T  	TC 10m	max_t_tc_10m	n
+CORKET	28	Deg C	Min T  	TC 10m	min_t_tc_10m	n
+CORKET	29	Deg C	Min T  	TC 10m	min_t_tc_10m_2	n
+CORKET	30	Deg C	10m-2m 	 Mx dT	mx_dt_10m_2m	n
+CORKET	31	Deg C	10m-2m 	 Mn dT	mn_dt_10m_2m	n
+CORKET	32	Deg C	10m-2m 	Delta T	delta_t_10m_2m	n
+CORKET	33	 VWC 	SM #2  	@ 2 in.	VWC_soil2_2in	n
+CORKET	34	 VWC 	SM #2  	@ 4 in.	VWC_soil2_4in	n
+CORKET	35	 VWC 	SM #2  	@ 8 in.	VWC_soil2_8in	n
+CORKET	36	 VWC 	SM #2  	@ 20 in	VWC_soil2_20in	n
+CORKET	37	 VWC 	SM #2  	@ 40 in	VWC_soil2_40in	n
+CORKET	38	dS/m 	"Soil 2"""	Conduct	conduct_soil_2in	n
+CORKET	39	dS/m 	"Soil 4"""	Conduct	conduct_soil_4in	n
+CORKET	40	dS/m 	"Soil 8"""	Conduct	conduct_soil_8in	n
+CORKET	41	dS/m 	Soil 20	Conduct	conduct_soil_20in	n
+CORKET	42	dS/m 	Soil 40	Conduct	conduct_soil_40in	n
+CORKET	43	Deg C	"2 ""Soil"	Av Tp#2	av_temp_soil2_2in	n
+CORKET	44	Deg C	"4 ""Soil"	Av Tp#2	av_temp_soil2_4in	n
+CORKET	45	Deg C	"8 ""Soil"	Av Tp#2	av_temp_soil2_8in	n
+CORKET	46	Deg C	"20""Soil"	Av Tp#2	av_temp_soil2_20in	n
+CORKET	47	Deg C	"40""Soil"	Av Tp#2	av_temp_soil2_40in	n
+CORKET	48	     	"Soil 2"""	 Perm.	perm_soil_2in	n
+CORKET	49	     	"Soil 4"""	 Perm.	perm_soil_4in	n
+CORKET	50	     	"Soil 8"""	 Perm.	perm_soil_8in	n
+CORKET	51	     	Soil 20	 Perm.	perm_soil_20in	n
+CORKET	52	     	Soil 40	 Perm.	perm_soil_40in	n
+CORKET	53	     	Station	 Id. #	station_id	n
+CORALM	1	:          	:   Date   	:YYYY/MM/DD	date	D
+CORALM	2	  LST  	 Time  	 hh:mm 	time	t
+CORALM	3	 W/m2	 Solar 	  Rad. 	solar_rad_Wm2	n
+CORALM	4	 m/s 	  Wind 	  Speed	wind_speed_ms	n
+CORALM	5	 Deg 	 Wind  	 Direc 	wind_direc_deg	n
+CORALM	6	 m/s 	Mx Gust	 Speed 	mx_gust_spd_ms	n
+CORALM	7	Deg C	 Av Air	  Temp 	av_air_temp_C	n
+CORALM	8	  %  	  Rel  	Humidty	rel_humidity	n
+CORALM	9	mbar 	 Barom 	 Press 	pressure_mbar	n
+CORALM	10	Deg C	"2"" Soil"	Ave Tmp	av_temp_soil_2in	n
+CORALM	11	Deg C	"10""Soil"	Av Temp	av_temp_soil_10in	n
+CORALM	12	Deg C	"20""Soil"	Av Temp	av_temp_soil_20in	n
+CORALM	13	 VWC 	Soil M 	@ 2 in.	VWC_soil_2in	n
+CORALM	14	 VWC 	Soil M 	@ 10 in	VWC_soil_10in	n
+CORALM	15	 VWC 	Soil M 	@ 20 in	VWC_soil_20in	n
+CORALM	16	volts	Max Bat	 Volts 	max_battery_V	n
+CORALM	17	volts	Min Bat	 Volts 	min_battery_V	n
+CORALM	18	volts	Battery	Voltage	battery_V	n
+CORALM	19	Deg C	Dat Pan	  Temp 	dat_pan_temp_C	n
+CORALM	20	     	 Tx Pwr	Forward	tx_pwr_forward	n
+CORALM	21	     	 Tx Pwr	Reflect	tx_pwr_reflect	n
+CORALM	22	     	Station	 Id. # 	station_id	n
+CORMEX	1	:          	:   Date   	:YYYY/MM/DD	date	D
+CORMEX	2	  LST  	 Time  	 hh:mm 	time	t
+CORMEX	3	 W/m2	 Solar 	  Rad. 	solar_rad_Wm2	n
+CORMEX	4	 m/s 	  Wind 	  Speed	wind_speed_ms	n
+CORMEX	5	 Deg 	 Wind  	 Direc 	wind_direc_deg	n
+CORMEX	6	 m/s 	Mx Gust	 Speed 	mx_gust_spd_ms	n
+CORMEX	7	Deg C	 Av Air	  Temp 	av_air_temp_C	n
+CORMEX	8	  %  	  Rel  	Humidty	rel_humidity	n
+CORMEX	9	mbar 	 Barom 	 Press 	pressure_mbar	n
+CORMEX	10	Deg C	"2"" Soil"	Ave Tmp	av_temp_soil_2in	n
+CORMEX	11	Deg C	"10""Soil"	Av Temp	av_temp_soil_10in	n
+CORMEX	12	Deg C	"20""Soil"	Av Temp	av_temp_soil_20in	n
+CORMEX	13	 VWC 	Soil M 	@ 2 in.	VWC_soil_2in	n
+CORMEX	14	 VWC 	Soil M 	@ 10 in	VWC_soil_10in	n
+CORMEX	15	 VWC 	Soil M 	@ 20 in	VWC_soil_20in	n
+CORMEX	16	volts	Max Bat	 Volts 	max_battery_V	n
+CORMEX	17	volts	Min Bat	 Volts 	min_battery_V	n
+CORMEX	18	volts	Battery	Voltage	battery_V	n
+CORMEX	19	Deg C	Dat Pan	  Temp 	dat_pan_temp_C	n
+CORMEX	20	     	 Tx Pwr	Forward	tx_pwr_forward	n
+CORMEX	21	     	 Tx Pwr	Reflect	tx_pwr_reflect	n
+CORMEX	22	     	Station	 Id. # 	station_id	n
+CORSNO	1	:          	:   Date   	:YYYY/MM/DD	date	D
+CORSNO	2	  LST  	 Time  	 hh:mm 	time	t
+CORSNO	3	 W/m2	 Solar 	  Rad. 	solar_rad_Wm2	n
+CORSNO	4	 W/m2	Std dev	Sol.Rad	sd_solar_rad_Wm2	n
+CORSNO	5	 W/m2	  Max  	Solar R	max_solar_rad_Wm2	n
+CORSNO	6	 W/m2	  Min  	Solar R	min_solar_rad_Wm2	n
+CORSNO	7	 m/s 	  Wind 	  Speed	wind_speed_ms	n
+CORSNO	8	 m/s 	 Wind  	Vec Mag	wind_vec_mag_ms	n
+CORSNO	9	 Deg 	 Wind  	 Direc 	wind_direc_deg	n
+CORSNO	10	 Deg 	Std Dev	Wnd Dir	sd_wind_dir_deg	n
+CORSNO	11	 m/s 	Mx Gust	 Speed 	mx_gust_spd_ms	n
+CORSNO	12	 Deg 	Std Dev	Wnd Spd	sd_wnd_spd_ms	n
+CORSNO	13	 m/s 	  Min  	Wnd Spd	min_wind_spd_ms	n
+CORSNO	14	Deg C	 Mx Air	  Temp 	max_air_temp_C	n
+CORSNO	15	Deg C	 Mn Air	  Temp 	min_air_temp_C	n
+CORSNO	16	Deg C	 Av Air	  Temp 	av_air_temp_C	n
+CORSNO	17	  %  	Mx Rel 	Humidty	max_rel_humidity	n
+CORSNO	18	  %  	Mn Rel 	Humidty	mix_rel_humidity	n
+CORSNO	19	  %  	  Rel  	Humidty	rel_humidity	n
+CORSNO	20	mbar 	 Barom 	 Press 	pressure_mbar	n
+CORSNO	21	Deg C	"2"" Soil"	Max Tmp	max_temp_soil_2in	n
+CORSNO	22	Deg C	"2"" Soil"	Min Tmp	min_temp_soil_2in	n
+CORSNO	23	Deg C	"2"" Soil"	Ave Tmp	av_temp_soil_2in	n
+CORSNO	24	Deg C	"10""Soil"	Mx Temp	max_temp_soil_10in	n
+CORSNO	25	Deg C	"10""Soil"	Mn Temp	min_temp_soil_10in	n
+CORSNO	26	Deg C	"10""Soil"	Av Temp	av_temp_soil_10in	n
+CORSNO	27	Deg C	"20""Soil"	Mx Temp	max_temp_soil_20in	n
+CORSNO	28	Deg C	"20""Soil"	Mn Temp	min_temp_soil_20in	n
+CORSNO	29	Deg C	"20""Soil"	Av Temp	av_temp_soil_20in	n
+CORSNO	30	 VWC 	Soil M 	@ 2 in.	VWC_soil_2in	n
+CORSNO	31	 VWC 	Soil M 	@ 10 in	VWC_soil_10in	n
+CORSNO	32	 VWC 	Soil M 	@ 20 in	VWC_soil_20in	n
+CORSNO	33	Deg C	  2m   	Mx Temp	max_temp_2m_C	n
+CORSNO	34	Deg C	  2m   	Mn Temp	min_temp_2m_C	n
+CORSNO	35	Deg C	  2m   	Av Temp	av_temp_2m_C	n
+CORSNO	36	Deg C	Max T  	TC 10m 	max_t_tc_10m	n
+CORSNO	37	Deg C	Min T  	TC 10m 	min_t_tc_10m	n
+CORSNO	38	Deg C	Min T  	TC 10m 	min_t_tc_10m_2	n
+CORSNO	39	Deg C	10m-2m 	 Mx dT 	mx_dt_10m_2m	n
+CORSNO	40	Deg C	10m-2m 	 Mn dT 	mn_dt_10m_2m	n
+CORSNO	41	Deg C	10m-2m 	Delta T	delta_t_10m_2m	n
+CORSNO	42	 VWC 	SM #2  	@ 2 in.	VWC_soil2_2in	n
+CORSNO	43	 VWC 	SM #2  	@ 4 in.	VWC_soil2_4in	n
+CORSNO	44	 VWC 	SM #2  	@ 8 in.	VWC_soil2_8in	n
+CORSNO	45	 VWC 	SM #2  	@ 20 in	VWC_soil2_20in	n
+CORSNO	46	 VWC 	SM #2  	@ 40 in	VWC_soil2_40in	n
+CORSNO	47	dS/m 	"Soil 2"""	Conduct	conduct_soil_2in	n
+CORSNO	48	dS/m 	"Soil 4"""	Conduct	conduct_soil_4in	n
+CORSNO	49	dS/m 	"Soil 8"""	Conduct	conduct_soil_8in	n
+CORSNO	50	dS/m 	Soil 20	Conduct	conduct_soil_20in	n
+CORSNO	51	dS/m 	Soil 40	Conduct	conduct_soil_40in	n
+CORSNO	52	Deg C	"2 ""Soil"	Av Tp#2	av_temp_soil2_2in	n
+CORSNO	53	Deg C	"4 ""Soil"	Av Tp#2	av_temp_soil2_4in	n
+CORSNO	54	Deg C	"8 ""Soil"	Av Tp#2	av_temp_soil2_8in	n
+CORSNO	55	Deg C	"20""Soil"	Av Tp#2	av_temp_soil2_20in	n
+CORSNO	56	Deg C	"40""Soil"	Av Tp#2	av_temp_soil2_40in	n
+CORSNO	57	     	"Soil 2"""	 Perm. 	perm_soil_2in	n
+CORSNO	58	     	"Soil 4"""	 Perm. 	perm_soil_4in	n
+CORSNO	59	     	"Soil 8"""	 Perm. 	perm_soil_8in	n
+CORSNO	60	     	Soil 20	 Perm. 	perm_soil_20in	n
+CORSNO	61	     	Soil 40	 Perm. 	perm_soil_40in	n
+CORSNO	62	 mm  	 Snow  	 Depth 	snow_depth_mm	n
+CORSNO	63	     	Station	 Id. # 	station_id	n
