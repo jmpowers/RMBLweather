@@ -1,0 +1,16 @@
+source	id	name	latitude	longitude	distance	elevation	element	first_year	last_year	CoCoRaHS	url
+NOAA	US1COGN0018	CRESTED BUTTE 6.2 N	38.9603	-106.9908	1.2009052077613576	2927.9	PRCP	2004	2021	TRUE	https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail
+NOAA	US1COGN0030	MOUNT CRESTED BUTTE 0.3 ENE	38.9103	-106.9623	5.007692715694262	2941	PRCP	2008	2010	TRUE	https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0030/detail
+NOAA	US1COGN0066	CRESTED BUTTE 1.9 NNE	38.8947	-106.9685	6.391573260904948	2822.4	PRCP	2017	2021	TRUE	https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0066/detail
+NOAA	USS0006L11S	Butte	38.89	-106.95	7.498775695520406	3096.8	PRCP	1980	2021	FALSE	https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:USS0006L11S/detail
+NOAA	USC00051959	CRESTED BUTTE	38.8739	-106.9772	8.488293511215875	2702.7	PRCP	1909	2020	FALSE	https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:USC00051959/detail
+NOAA	US1COGN0020	CRESTED BUTTE 0.5 ENE	38.8722	-106.978	8.666423980810025	2706	PRCP	2004	2011	TRUE	https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0020/detail
+NOAA	USS0007K11S	Schofield Pass	39.02	-107.05	9.361403940434307	3261.4	PRCP	1985	2020	FALSE	https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:USS0007K11S/detail
+EPA	GTH161	RsrchMdw	38.95627	-106.98587	0.8651189138331935	2915	PRCP	1989	2011	NA	https://www3.epa.gov/castnet/site_pages/GTH161.html
+WRCC	CORBIL	billy	38.963	-106.993	1.5131368709566224	2917	PRCP	2015	2021	NA	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corbil
+WRCC	CORJUD	JuddFalls	38.964	-106.984	1.7161922170569952	3004	PRCP	NA	NA	NA	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corjud
+WRCC	CORKET	KettlePonds	38.942	-106.973	1.7507490275652149	2860	PRCP	2015	2016	NA	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corket
+WRCC	CORSNO	Snodgrass	38.933	-106.986	1.8810956062690807	3396	PRCP	NA	NA	NA	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corsno
+ESSDIVE	KCOMTCRE2	GoldLink	38.915	-106.959	4.720435593332739	2926	PRCP	2011	2020	NA	https://doi.org/doi:10.15485/1734790
+WRCC	CORMEX	MexicanCut	39.028	-107.064	10.780414228366322	3412	PRCP	NA	NA	NA	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?cormex
+WRCC	CORALM	Almont	38.655	-106.862	34.596713562863435	2469	PRCP	NA	NA	NA	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?coralm

@@ -28,6 +28,7 @@ library(lubridate)
 library(viridis)
 library(RColorBrewer)
 library(GGally)
+library(ggpmisc)
 library(knitr)
 library(kableExtra)
 knitr::opts_chunk$set(comment="", cache=T, warning = F, message = F, fig.path = "images_weather/")
@@ -101,13 +102,22 @@ Weather data from the RMBL Research Meadow
 
 * EPA CASTNET program, station ID [GTH161](https://www3.epa.gov/castnet/site_pages/GTH161.html)
 * Also collects air quality data - ozone and air filters - not yet included here
-* Starts in 1989 but precipitation data is missing after 2011-12-31 (not sure why, suspiciously at the end of the year), though temperature and air quality records continue to present
+* Starts in 1989 but precipitation data is missing after 2011-12-31 - suspiciously at the end of the year
+* The [CASTNET 2015 Factsheet](https://www.yakimacounty.us/DocumentCenter/View/13593/EPA2015-castnet-factsheet) says "In 2010, meteorological measurements were discontinued at most EPA-sponsored CASTNET sites due to changing priorities, which evolved based on input from policymakers and the research community. As a result, EPA developed a method to substitute historical average deposition velocities for missing MLM simulations (Bowker et al., 2011)." This is echoed in the [2010](https://www3.epa.gov/castnet/docs/annual_report_2010_v2.pdf) and [2011](https://www3.epa.gov/castnet/docs/annual_report_2011.pdf) annual reports.
+* Temperature and air quality records continue to present
+* [Metadata](https://www.uvm.edu/femc/data/archive/project/clean-air-status-trend-network-castnet/dataset/clean-air-status-trend-network-castnet/eml)
 * Provided hourly, so summarized daily, either propagating missing values or ignoring them (see code)
 * The plot and table show the number of missing hourly values per day
 
 ```{r EPA_CASTNET}
 hourly_GTH161 <- read_csv("data/EPA_CASTNET/CASTNET_GTH161_Meteorological_Hourly.csv.gz", 
                           col_types=cols(DATE_TIME=col_datetime("%m/%d/%Y %H:%M:%S"), QA_CODE=col_character()))
+
+# Tally and plot missing hourly values
+hourly_GTH161_missing <- hourly_GTH161 %>% group_by(date=date(DATE_TIME)) %>% 
+  filter(date < ymd("2012-01-01")) %>% summarize(missing_precip_hrs = sum(is.na(PRECIPITATION)))
+ggplot(hourly_GTH161_missing, aes(x=date, y=missing_precip_hrs)) + geom_point()
+table(hourly_GTH161_missing$missing_precip_hrs) %>% as.data.frame %>% rename(missing_hours=Var1, num_days=Freq) %>% kable
 
 # daily_GTH161 is used for daily_all, but 
 # this keeps precip sums when there is missing hourly values
@@ -116,16 +126,21 @@ daily_GTH161 <- hourly_GTH161 %>% mutate(date = date(DATE_TIME)) %>% filter(year
   summarize(TEMPERATURE=mean(TEMPERATURE, na.rm=T), PRECIPITATION = sum(PRECIPITATION, na.rm=T)) 
 
 # daily_GTH161_NA propagates any missing hourly values up to the day.
-# Could be customized to accept a few missing hours
-acceptable_NAs <- 0
-daily_GTH161_NA <- hourly_GTH161 %>% arrange(DATE_TIME) %>% mutate(date = date(DATE_TIME)) %>% group_by(date) %>% 
+daily_GTH161_NA <- hourly_GTH161 %>% arrange(DATE_TIME) %>% group_by(date = date(DATE_TIME)) %>% 
     summarize(tavg_C=mean(TEMPERATURE), tmax_C=max(TEMPERATURE), tmin_C=min(TEMPERATURE), 
-              prcp_mm = ifelse(sum(is.na(PRECIPITATION)) <= acceptable_NAs, sum(PRECIPITATION, na.rm=T), NA)) 
-
-hourly_GTH161_missing <- hourly_GTH161 %>% group_by(date=date(DATE_TIME)) %>% 
-  filter(date < ymd("2012-01-01")) %>% summarize(missing_precip_hrs = sum(is.na(PRECIPITATION)))
-ggplot(hourly_GTH161_missing, aes(x=date, y=missing_precip_hrs)) + geom_point()
-table(hourly_GTH161_missing$missing_precip_hrs) %>% as.data.frame %>% rename(missing_hours=Var1, num_days=Freq) %>% kable
+              prcp_mm = sum(PRECIPITATION), across(where(is.numeric), mean)) 
+# Could be customized to accept a few missing hours with maxNA:
+summarizeNA <- function(x, fun, maxNA = 0) {
+  ifelse(sum(is.na(x)) <= maxNA, fun(x, na.rm=T), NA)
+}              
+              
+# daily_GTH161_NA_7am counts precipitation occurring BEFORE 7 am as the previous day, to  
+# line up with CoCoRaHs datasets that I shifted one day back
+daily_GTH161_NA_7am <- hourly_GTH161 %>% arrange(DATE_TIME) %>% 
+  group_by(date = case_when(hour(DATE_TIME) <  7 ~ date(DATE_TIME) - days(1),
+                            hour(DATE_TIME) >= 7 ~ date(DATE_TIME))) %>% 
+    summarize(tavg_C=mean(TEMPERATURE), tmax_C=max(TEMPERATURE), tmin_C=min(TEMPERATURE), 
+              prcp_mm = sum(PRECIPITATION), across(where(is.numeric), mean)) 
 ```
 
 ## NOAA
@@ -135,22 +150,47 @@ Weather data from 7 stations near RMBL sourced from [NOAA's GHCN Daily dataset](
 * All stations within 10 km of MAxfield Meadow near Gothic
 * Daily summaries quality checked by GHCN
 * Includes Crested Butte (1909-present), Schofield Pass (1985-present), Butte (1980-present)
-* Stations beginning with US1COGN (Colorado-Gunnison County) are [community CoCoRaHS stations](https://www.cocorahs.org/Stations/ListStations.aspx), including  [billy barr's](https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail) [station in Gothic](https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-18). Unlike all the other datasets, the reported precipitation is from 7 am the previous day to 7 am that day. To handle this discrepancy coarsely, the date is set to the day before.
+* Stations beginning with US1COGN (Colorado-Gunnison County) are [community CoCoRaHS stations](https://www.cocorahs.org/Stations/ListStations.aspx), including  [billy barr's](https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail) [station in Gothic](https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-18). Unlike some the other datasets, the reported precipitation is from 7 am the previous day to 7 am that day, according to [CoCoRaHS](https://www.cocorahs.org/ViewData/ListDailyPrecipReports.aspx). For some stations, it ranges from 6:30-8am.
+* To handle this discrepancy coarsely, the date is set to the day before on CoCoRaHS stations, since 17/24 hr are from day prior, and most summer precipitation is in the afternoon. The better method is to change the time frames of an hourly dataset they are compared against (see below)
 
 ```{r NOAA}
 library(rnoaa)
 station_data <- ghcnd_stations()# long download unless cached
 NOAA_stations <- meteo_nearby_stations(lat_lon_df = maxfield_coords, station_data = station_data,
-                      radius = 10, var = c("PRCP", "TAVG"))$maxfield %>% #stations within 10 km radius of Maxfield Meadow
-    left_join(station_data %>% filter(element=="PRCP"))
+                      var = c("PRCP", "TAVG"), radius = 10)$maxfield %>% #stations within 10 km radius of Maxfield
+    left_join(station_data %>% filter(element=="PRCP")) %>% 
+  mutate(CoCoRaHS = str_sub(id,1,3) == "US1")
 remove(station_data)
 NOAA_stations_name <- with(NOAA_stations, set_names(name, id))
+NOAA_stations_CoCoRaHS <- NOAA_stations %>% filter(CoCoRaHS) %>% pull(id)
 
 daily_NOAA <- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %>% 
   mutate(across(contains("flag"), as.factor)) %>% #All units are in tenths of mm, converted to mm here.
   mutate(across(c("prcp","snow","snwd","wesd","wesf"), ~ as.integer(.x)/10, .names="{.col}_mm"), .keep="unused") %>% 
   mutate(across(c("tmin","tavg","tmax"), ~ as.integer(.x)/10, .names="{.col}_C"), .keep="unused") %>% 
-  mutate(date = case_when(str_sub(id) == "US1" ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am
+  mutate(date = case_when(id %in% NOAA_stations_CoCoRaHS ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am, so set them back a day
+```
+
+## CoCoRaHS
+
+Community precipitation monitoring stations using manual gauges emptied in the morning (around 7 am local).
+
+* The NOAA dataset includes a few of these stations
+* Daily reports exported from directly from [CoCoRaHS](http://data.cocorahs.org/cocorahs/export/exportmanager.aspx) for [Gunnison County, CO since 2000](http://data.cocorahs.org/export/exportreports.aspx?ReportType=Daily&dtf=1&Format=CSV&State=CO&County=GN&ReportDateType=reportdate&StartDate=4/6/2000&EndDate=4/6/2021&TimesInGMT=False)
+
+```{r cocorahs}
+daily_CoCoRaHS <- read_csv("data/NOAA_GHCN/CoCoRaHS_DailyPrecipReports_CO_GN.csv", guess_max=1e4) %>% 
+  mutate(across(TotalPrecipAmt:TotalSnowSWE, as.numeric),# sets "trace" measurements (T) to NA
+         across(starts_with("Station"), factor)) 
+
+ggplot(daily_CoCoRaHS, aes(x=ObservationDate, y=StationName, fill=TotalPrecipAmt)) + geom_tile()
+ggplot(daily_CoCoRaHS, aes(x=ObservationTime, y=StationName)) + geom_point(shape=1, alpha=0.2)
+
+daily_CoCoRaHS %>% group_by(StationName, StationNumber) %>% summarize(across(c(Latitude, Longitude), unique)) %>% 
+  left_join(read_tsv("data/NOAA_GHCN/CoCoRaHS_Stations_CO_GN.tsv")) %>% 
+  mutate(StationNumber = cell_spec(StationNumber, "html", link = Link), .keep="unused") %>%
+  select(-c(Type, State, County, OldStationNumber)) %>% 
+  kable("html", escape = FALSE) %>%  kable_styling(bootstrap_options = c("hover", "condensed")) 
 ```
 
 ## NCEI
@@ -199,6 +239,13 @@ daily_all <- daily_NOAA %>% filter(id == "US1COGN0018") %>%
   rename(EPA_RsrchMdw=PRECIPITATION, ESSDIVE_GoldLink=Precip, WRCC_billy=precip_mm, NOAA_billy=prcp_mm) %>% 
   mutate(yr = year(date), mo = month(date, label=F),
          ground_covered = factor(c("smmr","wntr"))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by="day")))]) 
+
+# The datasets summarized to line up with the NOAA CoCoRaHS time window, in wide format
+daily_all_7am <- daily_GTH161_NA_7am %>% select(date, prcp_mm) %>% mutate(id="GTH161") %>% 
+  bind_rows(daily_NOAA %>% select(id, date, prcp_mm) %>% filter(id %in% NOAA_stations_CoCoRaHS)) %>% 
+  pivot_wider(names_from="id", values_from="prcp_mm") %>% arrange(date) %>% 
+  rename(NOAA_billy="US1COGN0018", EPA_RsrchMdw="GTH161") %>% 
+  mutate(ground_covered = factor(c("smmr","wntr"))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by="day")))]) 
 ```
 
 Fill in EPA CASTNET data since 2011 with NOAA precip from billy's NOAA station in Gothic.
@@ -248,10 +295,10 @@ stations_pal <- with(all_stations, set_names(color, short_name))
 stations_name <- with(all_stations, set_names(short_name, id))
 stations_source_name <- with(all_stations, set_names(source_name, id))
 
-all_stations %>% mutate(id = cell_spec(id, "html", link = url), .keep="unused") %>%
-  select(-c(state, gsn_flag, wmo_id, source_name, short_name, color)) %>% relocate(source) %>% 
-  kable("html", escape = FALSE) %>%
-  kable_styling(bootstrap_options = c("hover", "condensed")) 
+all_stations %>% select(-c(state, gsn_flag, wmo_id, source_name, short_name, color)) %>% relocate(source) %>% 
+  write_tsv("data/all_stations.tsv") %>% 
+  mutate(id = cell_spec(id, "html", link = url), .keep="unused") %>%
+  kable("html", escape = FALSE) %>%  kable_styling(bootstrap_options = c("hover", "condensed")) 
 ```
 
 ## Map
@@ -273,14 +320,14 @@ autoplot(map.latlon) +
 The range that each station was active collecting precipitation or temperature data. Note that data have not been cleaned at all yet, so there are unrealistic extreme values.
 
 ```{r coverage}
-ggplot(daily_long, aes(x=date, y=id, color=prcp_mm)) + geom_tile() +
+ggplot(daily_long, aes(x=date, y=id, fill=prcp_mm)) + geom_tile() +
   scale_y_discrete(labels=stations_source_name) + 
-  labs(y="Station",x="Year", color="Daily precipitation (mm)") + 
+  labs(y="Station",x="Year", fill="Daily precipitation (mm)") + 
   theme_minimal() + theme(legend.position = "top")
 
-ggplot(daily_long, aes(x=date, y=id, color=tmax_C)) + geom_tile() +
+ggplot(daily_long, aes(x=date, y=id, fill=tmax_C)) + geom_tile() +
   scale_y_discrete(labels=stations_source_name) + scale_color_viridis_c(option="inferno") +
-  labs(y="Station",x="Year", color="Maximum temperature (C)") + 
+  labs(y="Station",x="Year", fill="Maximum temperature (C)") + 
   theme_minimal() + theme(legend.position = "top")
 ```
 
@@ -319,7 +366,11 @@ lower_combo <- function (data, mapping, ...) {
 }
 ggpairs(daily_all %>% select(all_of(unname(stations[-1])), ground_covered), mapping=aes(color=ground_covered,shape=ground_covered), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))
 
-filter(daily_all) %>% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + labs(color="Snow cover")
+filter(daily_all) %>% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + labs(color="Snow cover") + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T)
+
+filter(daily_all_7am) %>% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + labs(color="Snow cover") + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T)
 ```
 
 # Monthly precip 1989-present
