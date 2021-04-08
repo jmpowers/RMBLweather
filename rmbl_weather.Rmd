@@ -43,13 +43,14 @@ maxfield_coords <- data.frame(id = "maxfield", name="MaxfieldMdw", latitude = 38
 Weather data from [7 RMBL stations](https://wrcc.dri.edu/rmbl/)
 
 * Provided by the Western Regional Climate Center, the Desert Research Institute, and the Rocky Mountain Biological Laboratory
-* Raw data in metric units (cleaned "FPA" data unavailable) - lots of cleanup needed, no interspersed missing values
+* Raw data in metric units (cleaned "FPA" data unavailable) - lots of cleanup needed, no interspersed missing values, so may not have been quality checked at all.
 * [Downloaded](https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corbil) as xls that is actually a tsv, and added quotes around each text cell, and gzipped
-* Columns renamed according to /data/WRCC/weather_wrcc_metadata.csv
+* Columns renamed according to [metadata](data/WRCC/weather_wrcc_metadata.csv)
 * [Flags](https://wrcc.dri.edu/cgi-bin/wea_listex.pl?flags) on each column indicate 0 = raw data, (M)issing data, (E)stimated data, (N)on-measuring time interval
-* Data for billy's station runs 2009 - present (valid precip data starts in 2015), other stations run 2009 - 2016 and lack precip but have soil moisture
+* Data for billy's station runs 2009 - present (valid precip data starts 2015-07-01, temperature starts 2015-10-01), other stations run 2009 - 2016 and lack precip but have soil moisture
 * Data are provided at 10-min intervals, so took the mean (or sum for precip) to aggregate hourly and then daily results
 * Then removed some precipitation entries much greater than 50 mm/day that were interspersed with valid data
+* [Daily summary RData file](data/WRCC/daily_WRCC.rda)
 
 ```{r WRCC_meatdata}
 wrcc_metadata_noflags <- read_tsv("data/WRCC/weather_wrcc_metadata.tsv") %>% mutate(index = row_number(), flag=F)
@@ -57,7 +58,7 @@ wrcc_metadata <- bind_rows(wrcc_metadata_noflags, wrcc_metadata_noflags %>% sele
                              filter(! name_metric %in% c("date","time")) %>% 
   mutate(name_metric=paste0("flag_",name_metric), col_type="f",flag=T)) %>% arrange(index) %>% fill(id)
 
-#the chunk below loads the WRCC data but is slow
+#the chunk below loads the WRCC data (slow)
 load("data/WRCC/daily_WRCC.rda")
 ```
 
@@ -68,32 +69,48 @@ tenmin_WRCC <- list.files("data/WRCC/", ".tsv.gz", full.names=T) %>% set_names(g
   map_dfr( ~ read_tsv(.x, skip = 4, na=c("","M"), col_types=paste0(filter(wrcc_metadata, id==get_WRCC_id(.x))$col_type, collapse=""),
                       col_names=filter(wrcc_metadata, id==get_WRCC_id(.x))$name_metric), .id="id") 
 
-#TODO this comment says to "take the mean of the precip rate per hour that is reported every 10 min", but the code sums it and that matches well on the monthly scale with other stations
+#this comment says to "take the mean of the precip rate per hour that is reported every 10 min", but the code sums it and that matches well on the monthly scale with other stations
 hourly_WRCC <- tenmin_WRCC %>% mutate(hour=hour(time)) %>% group_by(id, date, hour) %>% 
   summarize(precip_mm = sum(precip_mm), across(where(is.numeric), mean)) 
 
-daily_WRCC <- hourly_WRCC %>% group_by(id, date) %>% 
+get_daily_WRCC <- function(grouped_hourly_data) {
+  daily <- grouped_hourly_data %>% group_by(id, .add=T) %>% 
   summarize(precip_mm = sum(precip_mm), #sum the hourly precip rates over each 24 hrs 
-            max_av_temp_air_C = max(av_temp_air_C), min_av_temp_air_C = min(av_temp_air_C), across(where(is.numeric), mean)) %>% 
+            max_av_temp_air_C = max(av_temp_air_C), min_av_temp_air_C = min(av_temp_air_C),
+            across(where(is.numeric), mean)) %>% 
   mutate(year=factor(year(date)), julian=yday(date),
-         precip_mm = ifelse(precip_mm>50 | precip_mm < 0, NA, precip_mm)) #cut nonsense precip values >50mm/day or < 0
+         precip_mm = ifelse(precip_mm>50 | precip_mm < 0, NA, precip_mm)) #cut nonsense precip values
+}
+daily_WRCC <- hourly_WRCC %>% group_by(date) %>% get_daily_WRCC()
+daily_WRCC_7am <-  hourly_WRCC %>% filter(id %in% c("CORBIL", "CORKET")) %>% 
+  group_by(date = case_when(hour <  7 ~ date - days(1), hour >= 7 ~ date)) %>% get_daily_WRCC() %>% 
+  select(id, date, year, julian, precip_mm)
 
-save(daily_WRCC, file="data/WRCC/daily_WRCC.rda")
-
-#for CORBIL filter(date >= as.Date("2015-07-01"))#when precip starts to have reasonable values, temp starts 2015-10-01.
-#no missing precip values in CORBIL - may not have been quality checked.
+save(daily_WRCC, daily_WRCC_7am, file="data/WRCC/daily_WRCC.rda")
 ```
 
 ## ESS-DIVE
 
-Weather data from the Gold Link station in Mt. Crested Butte
+Weather data from the Gold Link Wunderground station in Mt. Crested Butte
 
-* Data are QAQC'd, gap-filled, and summarized daily.
+* Data are QAQC'd, gap-filled, and summarized hourly or daily.
+* [Metadata](data/Wunderground/KComCret_metadata.txt) and [abstract](data/Wunderground/Gap_filled_meteorological_data_2011_2020_and.xml)
 * "This dataset is a gap-filled meteorological dataset (years 2011-2020) that includes modeled potential evapotranspiration from a station near the pumphouse on the East River (KCOMTCRE2 WeatherUnderground) near the top of the ridge at the Pumphouse PLM wells. These datasets are useful as model inputs. The [KOMTCRE2 station](https://www.wunderground.com/dashboard/pws/KCOMTCRE2/table/2020-12-7/2020-12-7/daily) is located on Mt. Crested Butte in Colorado. The purpose of this dataset is to use as input to hydrological and flow-reactive transport models as meteorological forcing. One attached file includes metadata files with definitions for all variables and units. Subsequent files include the same time series dataset, but aggregated and gap-filled at different time-stamp intervals. These include 5 minute time-series, 15 minute time-series, 30 minute time-series, 1 hour time-series, daily time-series, and hourly and daily modeled evapotranspiration."
 * Michelle Newcomer and David Brian Rogers. 2020. Gap-filled meteorological data (2011-2020) and modeled potential evapotranspiration data from the KCOMTCRE2 WeatherUnderground weather station, from the East River Watershed, Colorado. ESS-DIVE: Deep Insight for Earth Science Data. [doi:10.15485/1734790](https://doi.org/10.15485/1734790), version: ess-dive-ce2fd798f9d81f5-20201210T030125380.
+* The plot compares the daily precip calculatedd from summing the hourly precipitation rates (in mm/min), or taking the maximum daily accumulated precip. These two numbers should be the same but sometimes differ at midnight (PrecipAccum is sometimes nonzero at midnight), and sometimes when the PrecipRate does not bump up the PrecipAccum. Discrepancy might an artifact of the QA/QC applied by the authors.
 
 ```{r Wunderground}
+hourly_KCOMTCRE2 <- read_csv("data/Wunderground/2011_2020_KComCret_60min_Measured_QAQC.csv", guess_max = 3000)
 daily_KCOMTCRE2 <- read_csv("data/Wunderground/2011_2020_KComCret_1day_ETModeled.csv")
+
+daily_KCOMTCRE2_7am <- hourly_KCOMTCRE2 %>% 
+  group_by(date = case_when(hr <  7 ~ date - days(1), hr >= 7 ~ date)) %>% 
+  summarize(Precip = sum(PrecipRate)*60) #units are mm/min
+
+daily_KCOMTCRE2_raw <- hourly_KCOMTCRE2 %>% group_by(date) %>% 
+  summarize(Sum_PrecipRate = sum(PrecipRate)*60, Max_PrecipAccum = max(PrecipAccum)) 
+ggplot(daily_KCOMTCRE2_raw) + geom_point(aes(x=Max_PrecipAccum, y=Sum_PrecipRate)) + coord_cartesian(ylim=c(0,50))
+#hourly_KCOMTCRE2 %>% filter(date %in% (daily_KCOMTCRE2_raw %>% filter(abs(Max_PrecipAccum - Sum_PrecipRate > 0.01)) %>% #pull(date))) %>% View
 ```
 
 ## EPA CASTNET
@@ -114,10 +131,10 @@ hourly_GTH161 <- read_csv("data/EPA_CASTNET/CASTNET_GTH161_Meteorological_Hourly
                           col_types=cols(DATE_TIME=col_datetime("%m/%d/%Y %H:%M:%S"), QA_CODE=col_character()))
 
 # Tally and plot missing hourly values
-hourly_GTH161_missing <- hourly_GTH161 %>% group_by(date=date(DATE_TIME)) %>% 
-  filter(date < ymd("2012-01-01")) %>% summarize(missing_precip_hrs = sum(is.na(PRECIPITATION)))
-ggplot(hourly_GTH161_missing, aes(x=date, y=missing_precip_hrs)) + geom_point()
-table(hourly_GTH161_missing$missing_precip_hrs) %>% as.data.frame %>% rename(missing_hours=Var1, num_days=Freq) %>% kable
+hourly_GTH161_missing <- hourly_GTH161 %>% filter(DATE_TIME < ymd("2012-01-01")) %>% 
+  group_by(date=date(DATE_TIME)) %>% summarize(missing_precip_hrs = sum(is.na(PRECIPITATION)))
+ggplot(hourly_GTH161_missing, aes(x=date, y=missing_precip_hrs)) + geom_point() + 
+  geom_text(data = hourly_GTH161_missing %>% count(missing_precip_hrs), aes(x=ymd("1988-01-01"), label=n))
 
 # daily_GTH161 is used for daily_all, but 
 # this keeps precip sums when there is missing hourly values
@@ -130,9 +147,9 @@ daily_GTH161_NA <- hourly_GTH161 %>% arrange(DATE_TIME) %>% group_by(date = date
     summarize(tavg_C=mean(TEMPERATURE), tmax_C=max(TEMPERATURE), tmin_C=min(TEMPERATURE), 
               prcp_mm = sum(PRECIPITATION), across(where(is.numeric), mean)) 
 # Could be customized to accept a few missing hours with maxNA:
-summarizeNA <- function(x, fun, maxNA = 0) {
-  ifelse(sum(is.na(x)) <= maxNA, fun(x, na.rm=T), NA)
-}              
+#summarizeNA <- function(x, fun, maxNA = 0) {
+#  ifelse(sum(is.na(x)) <= maxNA, fun(x, na.rm=T), NA)
+#}              
               
 # daily_GTH161_NA_7am counts precipitation occurring BEFORE 7 am as the previous day, to  
 # line up with CoCoRaHs datasets that I shifted one day back
@@ -147,11 +164,13 @@ daily_GTH161_NA_7am <- hourly_GTH161 %>% arrange(DATE_TIME) %>%
 
 Weather data from 7 stations near RMBL sourced from [NOAA's GHCN Daily dataset](https://www.ncdc.noaa.gov/data-access/land-based-station-data/land-based-datasets/global-historical-climatology-network-ghcn).
 
-* All stations within 10 km of MAxfield Meadow near Gothic
+* All stations within 10 km of Maxfield Meadow near Gothic
 * Daily summaries quality checked by GHCN
-* Includes Crested Butte (1909-present), Schofield Pass (1985-present), Butte (1980-present)
-* Stations beginning with US1COGN (Colorado-Gunnison County) are [community CoCoRaHS stations](https://www.cocorahs.org/Stations/ListStations.aspx), including  [billy barr's](https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail) [station in Gothic](https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-18). Unlike some the other datasets, the reported precipitation is from 7 am the previous day to 7 am that day, according to [CoCoRaHS](https://www.cocorahs.org/ViewData/ListDailyPrecipReports.aspx). For some stations, it ranges from 6:30-8am.
-* To handle this discrepancy coarsely, the date is set to the day before on CoCoRaHS stations, since 17/24 hr are from day prior, and most summer precipitation is in the afternoon. The better method is to change the time frames of an hourly dataset they are compared against (see below)
+* Includes long records from Crested Butte (1909-present), Schofield Pass (1985-present), Butte (1980-present)
+* The Crested Butte station precip is [collected at 9:00 am](https://www.ncdc.noaa.gov/homr/#ncdcstnid=20003581&tab=PHR), but the collection time is unknown for Schofield Pass and Butte, which are probably automated (midnight-midnight)
+* Stations beginning with US1COGN (Colorado-Gunnison County) are [community CoCoRaHS stations](https://www.cocorahs.org/Stations/ListStations.aspx), including  [billy barr's](https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail) [station in Gothic](https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-18). Unlike some the other datasets, the reported precipitation is from 7 am the previous day to 7 am that day, according to [CoCoRaHS](https://www.cocorahs.org/ViewData/ListDailyPrecipReports.aspx). For some stations, it ranges from 6:30-8:00 am.
+* To handle this discrepancy coarsely, the date is set to the day before on CoCoRaHS stations and NOAA Crested Butte, since most hours of precip are from day prior, and most summer precipitation is in the afternoon.
+* Then in compared hourly datasets (EPA, WRCC, ESSDIVE), the date is set to the day prior for precip collected before 7 am.
 
 ```{r NOAA}
 library(rnoaa)
@@ -162,13 +181,13 @@ NOAA_stations <- meteo_nearby_stations(lat_lon_df = maxfield_coords, station_dat
   mutate(CoCoRaHS = str_sub(id,1,3) == "US1")
 remove(station_data)
 NOAA_stations_name <- with(NOAA_stations, set_names(name, id))
-NOAA_stations_CoCoRaHS <- NOAA_stations %>% filter(CoCoRaHS) %>% pull(id)
+NOAA_stations_morning <- NOAA_stations %>% filter(CoCoRaHS) %>% pull(id) %>% c("USC00051959") #Crested Butte is collected in the morning too, at 9am
 
 daily_NOAA <- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %>% 
   mutate(across(contains("flag"), as.factor)) %>% #All units are in tenths of mm, converted to mm here.
   mutate(across(c("prcp","snow","snwd","wesd","wesf"), ~ as.integer(.x)/10, .names="{.col}_mm"), .keep="unused") %>% 
   mutate(across(c("tmin","tavg","tmax"), ~ as.integer(.x)/10, .names="{.col}_C"), .keep="unused") %>% 
-  mutate(date = case_when(id %in% NOAA_stations_CoCoRaHS ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am, so set them back a day
+  mutate(date = case_when(id %in% NOAA_stations_morning ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am, so set them back a day
 ```
 
 ## CoCoRaHS
@@ -177,19 +196,23 @@ Community precipitation monitoring stations using manual gauges emptied in the m
 
 * The NOAA dataset includes a few of these stations
 * Daily reports exported from directly from [CoCoRaHS](http://data.cocorahs.org/cocorahs/export/exportmanager.aspx) for [Gunnison County, CO since 2000](http://data.cocorahs.org/export/exportreports.aspx?ReportType=Daily&dtf=1&Format=CSV&State=CO&County=GN&ReportDateType=reportdate&StartDate=4/6/2000&EndDate=4/6/2021&TimesInGMT=False)
+* Plots of data coverage and observation times, table of currently active stations
+* See complete [Gunnison County station list](data/NOAA_GHCN/CoCoRaHS_Stations_CO_GN.tsv)
 
 ```{r cocorahs}
 daily_CoCoRaHS <- read_csv("data/NOAA_GHCN/CoCoRaHS_DailyPrecipReports_CO_GN.csv", guess_max=1e4) %>% 
-  mutate(across(TotalPrecipAmt:TotalSnowSWE, as.numeric),# sets "trace" measurements (T) to NA
+  mutate(across(TotalPrecipAmt:TotalSnowSWE, ~25.4*as.numeric(.x)),# T(race) to NA, convert inches to mm
          across(starts_with("Station"), factor)) 
 
 ggplot(daily_CoCoRaHS, aes(x=ObservationDate, y=StationName, fill=TotalPrecipAmt)) + geom_tile()
 ggplot(daily_CoCoRaHS, aes(x=ObservationTime, y=StationName)) + geom_point(shape=1, alpha=0.2)
 
-daily_CoCoRaHS %>% group_by(StationName, StationNumber) %>% summarize(across(c(Latitude, Longitude), unique)) %>% 
-  left_join(read_tsv("data/NOAA_GHCN/CoCoRaHS_Stations_CO_GN.tsv")) %>% 
-  mutate(StationNumber = cell_spec(StationNumber, "html", link = Link), .keep="unused") %>%
-  select(-c(Type, State, County, OldStationNumber)) %>% 
+CoCoRaHS_stations <- daily_CoCoRaHS %>% group_by(StationName, StationNumber) %>% 
+  summarize(across(c(Latitude, Longitude), unique), medianObservationTime=median(ObservationTime)) %>% 
+  left_join(read_tsv("data/NOAA_GHCN/CoCoRaHS_Stations_CO_GN.tsv")) 
+
+CoCoRaHS_stations %>% mutate(StationNumber = cell_spec(StationNumber, "html", link = Link), .keep="unused") %>%
+  select(-c(Type, State, County, OldStationNumber)) %>% filter(Active=="Yes") %>% 
   kable("html", escape = FALSE) %>%  kable_styling(bootstrap_options = c("hover", "condensed")) 
 ```
 
@@ -215,60 +238,87 @@ gsodr.inventory <- get_inventory() %>% #long download
 groundcover <- read_tsv("./data/gothicwx/groundcover.tsv") %>% 
   mutate(across(starts_with("first"), list(day=yday)), year=year(first_0_cm))
 
-first_snow_2020 <- as.POSIXct(c("2020-10-25", "2020-12-31"), tz="UTC") #TODO check this first permanent snow of 2020 (not yet on billy's website)
+groundcover_2021 <- tibble(first_snow=ymd("2020-10-25"), first_0_cm=ymd("2021-05-01")) 
+#TODO check this first permanent snow of 2020 (not yet on billy's website), and fill in actual value for first_0_cm
+
+get_seasons <- function(dates) { 
+  factor(c("smmr","wntr"))[ifelse(year(dates) < min(groundcover$year), NA, 
+         1+dates %in% do.call(c, 
+                             map2(bind_rows(groundcover, groundcover_2021)$first_snow, 
+                                  bind_rows(groundcover, groundcover_2021)$first_0_cm, 
+                                  ~ seq(date(.x), date(.y), by="day"))))]
+}
 ```
 
 ## Combine datasets
 
 Combine selected daily weather station data in long or wide format.
 ```{r combine_data}
+#Combine a few of the closer weather station precipitation datasets and snowmelt in wide format
+daily_all <- 
+  daily_NOAA %>% filter(id == "US1COGN0018") %>% 
+  full_join(daily_GTH161) %>% full_join(daily_KCOMTCRE2) %>% 
+  full_join(daily_WRCC %>% filter(id=="CORBIL"), by="date") %>% 
+  rename(EPA_RsrchMdw=PRECIPITATION, ESSDIVE_GoldLink=Precip, WRCC_billy=precip_mm, NOAA_billy=prcp_mm) %>% 
+  mutate(yr = year(date), mo = month(date, label=F),
+         ground_covered = get_seasons(date)) %>% filter(year(date) < 2021)
+
 #Combine all the weather stations daily precip and temperature statistics in long format
 daily_long <- bind_rows( 
   GTH161 = daily_GTH161_NA %>% select(date, tavg_C, tmax_C, tmin_C, prcp_mm),
   KCOMTCRE2 = daily_KCOMTCRE2 %>% select(date, tavg_C = Tmean, tmax_C = Tmax, tmin_C = Tmin, prcp_mm = Precip),
   .id="id") %>% 
-  bind_rows(daily_WRCC %>% select(id, date, 
-                                  tavg_C = av_temp_air_C, tmax_C = max_av_temp_air_C, tmin_C = min_av_temp_air_C,
+  bind_rows(daily_WRCC %>% select(id, date, tavg_C = av_temp_air_C, 
+                                  tmax_C = max_av_temp_air_C, tmin_C = min_av_temp_air_C, 
                                   prcp_mm = precip_mm)) %>%  
-  bind_rows(daily_NOAA %>% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %>% mutate(id=factor(id))
+  bind_rows(daily_NOAA %>% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %>% mutate(id=factor(id))%>% filter(year(date) < 2021)
 
-#Combine a few of the closer weather station precipitation datasets and snowmelt in wide format
-daily_all <- daily_NOAA %>% filter(id == "US1COGN0018") %>% 
-  full_join(daily_GTH161) %>% full_join(daily_KCOMTCRE2) %>% 
-  full_join(daily_WRCC %>% filter(id=="CORBIL"), by="date") %>% 
-  rename(EPA_RsrchMdw=PRECIPITATION, ESSDIVE_GoldLink=Precip, WRCC_billy=precip_mm, NOAA_billy=prcp_mm) %>% 
-  mutate(yr = year(date), mo = month(date, label=F),
-         ground_covered = factor(c("smmr","wntr"))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by="day")))]) 
+# The datasets summarized to line up with the morning collections
+daily_long_7am <- bind_rows( 
+  GTH161 = daily_GTH161_NA_7am %>% select(date, prcp_mm),
+  KCOMTCRE2 = daily_KCOMTCRE2_7am %>% select(date, prcp_mm = Precip), .id="id") %>% 
+  bind_rows(daily_WRCC_7am %>% select(id, date, prcp_mm = precip_mm)) %>%  
+  bind_rows(daily_NOAA %>% select(id, date, prcp_mm)) %>% # morning stations shifted back a day
+  mutate(ground_covered = get_seasons(date)) %>% filter(year(date) < 2021)
 
-# The datasets summarized to line up with the NOAA CoCoRaHS time window, in wide format
-daily_all_7am <- daily_GTH161_NA_7am %>% select(date, prcp_mm) %>% mutate(id="GTH161") %>% 
-  bind_rows(daily_NOAA %>% select(id, date, prcp_mm) %>% filter(id %in% NOAA_stations_CoCoRaHS)) %>% 
-  pivot_wider(names_from="id", values_from="prcp_mm") %>% arrange(date) %>% 
-  rename(NOAA_billy="US1COGN0018", EPA_RsrchMdw="GTH161") %>% 
-  mutate(ground_covered = factor(c("smmr","wntr"))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by="day")))]) 
+daily_all_7am <- daily_long_7am %>% 
+  pivot_wider(names_from="id", values_from="prcp_mm") %>% arrange(date)
 ```
 
-Fill in EPA CASTNET data since 2011 with NOAA precip from billy's NOAA station in Gothic.
+### Fill in EPA CASTNET data
 
-* TODO: Need to redo this with the EPA data summed from 7 am to 7 am.
+EPA precip data from the Research Meadow ends in 2011, so fill in with from billy's NOAA/CoCoRaHs station in Gothic.
+* Sum the EPA precipitation data (GTH161) from 7 am to 7 am to match CoCoRaHs period, and count hours before 7am as the previous day
 * Uses a simple linear model for their period of overlap, forced through zero
 * Fit separately for summer vs. winter (determined by billy's groundcover data)
-* See the regressions under [daily precip 1989-present](#daily-precip-1989-present)
+* billy's data fills gaps from 2012-present, and small gaps from 2004-2011 (US1COGN0018, summer r = 0.90)
+* Before that (1989-2004), small gaps are filled with a similar regression to the NOAA Crested Butte station (USC00051959, summer r = 0.75)
 
 ```{r EPA_NOAA_fill}
-#correlate daily EPA_RsrchMdw and NOAA_billy to predict what EPA would look like for 2012-2020
-EPA_NOAA_daily_model <-  lm(EPA_RsrchMdw ~ NOAA_billy:ground_covered+0, data=daily_all)
+EPA_billy_daily_model <-  lm(GTH161 ~ US1COGN0018:ground_covered+0, data=daily_all_7am)
+EPA_CB_daily_model <-     lm(GTH161 ~ USC00051959:ground_covered+0, data=daily_all_7am)
+
+daily_filled_7am <- daily_all_7am %>% 
+  mutate(EPA_NOAA_source = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), "NOAA_billy", 
+                                                               ifelse(!is.na(USC00051959), "NOAA_CB", NA)), "EPA") %>% factor,
+         EPA_NOAA_filled = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), predict(EPA_billy_daily_model),
+                                                        ifelse(!is.na(USC00051959), predict(EPA_CB_daily_model), NA)), GTH161))
+save(daily_filled_7am, file="data/daily_all.rda")
+
+monthly_filled_7am <- daily_filled_7am %>% group_by(yr = year(date), mo = month(date)) %>% 
+  summarize(across(-c(date, ground_covered, EPA_NOAA_source), ~ ifelse(sum(is.na(.x))>5, NA, sum(.x, na.rm=T))), .groups="drop") %>%
+  arrange(yr, mo)
 #EPA_NOAA_monthly_model <-lm(EPA_RsrchMdw ~ NOAA_billy*season, data=monthly_all %>% 
 #mutate(season=factor(c("wntr","smmr"))[1+mo %in% 6:9]))
-daily_all <- daily_all %>% 
-  mutate(EPA_predicted = is.na(EPA_RsrchMdw) & !is.na(NOAA_billy),
-         EPA_NOAA_filled = ifelse(is.na(EPA_RsrchMdw), predict(EPA_NOAA_daily_model, newdata=daily_all), EPA_RsrchMdw))
 
-stations <- c("EPA_NOAA_filled", "EPA_RsrchMdw","ESSDIVE_GoldLink","WRCC_billy","NOAA_billy")
-monthly_all <- daily_all %>% group_by(yr, mo) %>% 
-  summarize(across(all_of(stations), ~ ifelse(sum(is.na(.x))>5, NA, sum(.x, na.rm=T))), .groups="drop") %>% arrange(yr, mo) 
-
-save(daily_all, file="data/daily_all.rda")
+ggplot(daily_filled_7am %>% mutate(year=year(date)) %>% filter(year>=1989), aes(x=yday(date))) + 
+  facet_wrap(vars(year)) + 
+  geom_line(aes(y=40-10*as.integer(ground_covered))) + 
+  geom_point(aes(y=EPA_NOAA_filled, color=EPA_NOAA_source), size=0.5) + 
+  guides(color=guide_legend(override.aes = list(size=3)))+
+  labs(x="Day of year", y="EPA/NOAA precipiation (mm)", color="Filled from") + 
+  theme_minimal() + theme(legend.position="top", panel.spacing = unit(0,"pt"), 
+                          panel.grid.minor=element_blank(), panel.grid.major.x=element_blank())
 ```
 
 # Stations
@@ -331,53 +381,68 @@ ggplot(daily_long, aes(x=date, y=id, fill=tmax_C)) + geom_tile() +
   theme_minimal() + theme(legend.position = "top")
 ```
 
+# Compare daily precip
 
-# Daily precip 1989-present
+Compare summer precipitation data across [stations](#stations). 
 
-Compare precipitation data from the following [sources](#stations):
-
-* EPA Research Meadow (1989-2011)
-* billy's NOAA station in Gothic, CRESTED BUTTE 6.2 N, enrolled in CoCoRaHS (2004-present)
-* The EPA Research Meadow data extended with billy's NOAA station (EPA/NOAA, 1989-present)
-* billy's data on WRCC (2015-present), does not match his NOAA data (likely because of different summation windows)
-* Mt. Crested Butte Gold Link station cleaned by ESSDIVE (2011-2020)
-
-The correlation plots show how precipitation measurements are correlated on the daily scale. Since the NOAA_billy data from CoCoRaHS is shifted back a day (collected at 7 am the next day), it doesn't match up with the WRCC_billy data (or correlate well with the other stations), which are summed from midnight to midnight. Taking the [monthly](#monthly-precip-1989-present) sum makes them almost match.
+* The correlation plots show how precipitation measurements are correlated on the daily scale, after shifting the stations with morning collections back a day and grouping measurements in the hourly datasets before 7 am to the previous day.
+* Only summer data is shown in the correlation plot, as determined by billy's gothicwx groundcover data.
+* View the [full correlation plot matrix]("images_weather/corrplot_7am.pdf") to compare all the stations.
 
 ```{r weather_daily}
-ggplot(daily_all %>% filter(year(date) %in% 2018:2020), aes(y=EPA_NOAA_filled, x=yday(date))) + geom_col(aes(fill=ground_covered)) + 
-  facet_wrap(vars(year(date)), ncol=1) + labs(x="Day of year", y="EPA/NOAA precipiation (mm)", fill="Snow cover")
-
-daily_all %>% pivot_longer(unname(stations), names_to="station", values_to="precipitation_mm") %>% 
+daily_long_7am %>% mutate(yr = year(date)) %>% 
   filter(yday(date) >100, yday(date) < 240, yr %in% 2018:2020) %>%
-  ggplot(aes(x=yday(date), y=precipitation_mm, color=station, shape=ground_covered)) +  
-  geom_point() + facet_wrap(vars(yr), ncol=1) + theme(legend.position = "top", legend.direction="vertical") +
-  labs(x="Day of year", y = "Precipitation (mm)", color="Station", shape="Snow cover")
+  ggplot(aes(x=yday(date), y=prcp_mm, color=stations_name[id], shape=ground_covered)) +  
+  geom_point() + facet_wrap(vars(yr), ncol=1) + scale_color_manual(values=stations_pal) + 
+  labs(x="Day of year", y = "Precipitation (mm)", color="Station", shape="Snow cover") + 
+  theme(legend.position = "top")
 
+filter(daily_all_7am) %>% ggplot(aes(x=GTH161, y= US1COGN0018, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T) +
+  labs(color="Snow cover", x=stations_source_name["GTH161"], y=stations_source_name["US1COGN0018"])
+
+filter(daily_all_7am) %>% ggplot(aes(x=GTH161, y= USC00051959, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T) +
+  labs(color="Snow cover", x=stations_source_name["GTH161"], y=stations_source_name["USC00051959"])
+
+ggcorr(daily_all_7am %>% filter(ground_covered=="smmr") %>% 
+          select(-c(date, ground_covered)) %>% rename_with(~ stations_source_name[.x]), 
+       layout.exp=0.5, geom="tile", label_size=3, label=T, name="r", hjust = .9, size = 2.5)
+```
+
+```{r corrplot}
 precip_max <- 50
-lower_continuous <- function (data, mapping, ...) {
-    ggally_smooth(data = data, mapping = mapping, ..., method = "loess") + scale_shape_manual(values=c(1,2))+
+scatter_continuous <- function (data, mapping, method="p", use="pairwise", ...) {
+  corr <- cor(eval_data_col(data, mapping$x), eval_data_col(data, mapping$y), method=method, use=use)
+  colFn <- colorRampPalette(c("blue", "white", "red"), interpolate ='spline')
+  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
+  ggally_smooth(data = data, mapping = mapping, ..., method = "loess", color="blue", se=F, span=0.3) +
+    ggplot2::annotate("text", x=40, y=10, label = round(corr,2))+ 
+        theme_classic() + theme(panel.background = element_rect(fill=fill)) +
+    scale_shape_manual(values=c(1,2))+
     coord_cartesian(xlim=c(0,precip_max), ylim=c(0,precip_max)) + geom_abline(slope=1, intercept=0)+
-    scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))+scale_y_continuous(breaks=seq(0,precip_max, by=precip_max/5))
+    scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))+
+    scale_y_continuous(breaks=seq(0,precip_max, by=precip_max/5))
 }
-lower_combo <- function (data, mapping, ...) {
+facethist_combo <- function (data, mapping, ...) {
     ggally_facethist(data = data, mapping = mapping, binwidth=precip_max/50,...) +
     coord_cartesian(xlim=c(0,precip_max)) + scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))
 }
-ggpairs(daily_all %>% select(all_of(unname(stations[-1])), ground_covered), mapping=aes(color=ground_covered,shape=ground_covered), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))
-
-filter(daily_all) %>% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + labs(color="Snow cover") + 
-   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T)
-
-filter(daily_all_7am) %>% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + labs(color="Snow cover") + 
-   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T)
+corrplot_7am <- ggpairs(daily_all_7am %>% filter(ground_covered=="smmr") %>% 
+          select(-c(date, ground_covered)) %>% rename_with(~ stations_name[.x]), 
+        lower=list(continuous=wrap(scatter_continuous), na="blank"), 
+        upper=list(continuous=wrap(scatter_continuous), na="blank"))
+ggsave("images_weather/corrplot_7am.pdf", corrplot_7am, device=cairo_pdf, height=10, width=12)
 ```
+
 
 # Monthly precip 1989-present
 
-```{r weather_monthly}
+```{r weather_monthly, eval=FALSE}
 #recalculate Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station
-(EPA_89_06_July_avg_mm <- monthly_all %>% filter(mo==7, yr >= 1989, yr <= 2006) %>% pull(EPA_NOAA_filled) %>% mean)
+(EPA_89_06_July_avg_mm <- monthly_filled_7am %>% filter(mo==7, yr >= 1989, yr <= 2006) %>% pull(EPA_NOAA_filled) %>% mean)
 
 (water_addition_per_month_mm <- (14 / 4 / 2) * 31) #14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July
 
@@ -416,10 +481,10 @@ monthly_all %>% filter(mo %in% 5:9) %>% ggplot(aes(x=yr, color=factor(mo), group
 
 # Summer precip trends 1989-present
 
-Combined EPA Research Meadow / NOAA billy dataset from summers 1990-2020
+Combined EPA Research Meadow / NOAA  dataset from summers 1990-2020
 
 ```{r precip_trend}
-daily_all %>% filter(year(date)>1989, year(date)<2021) %>%
+daily_filled_7am %>% filter(year(date)>1989, year(date)<2021) %>%
   mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>%
   group_by(julian, decade) %>% 
   summarize(EPA_NOAA_filled = mean(EPA_NOAA_filled, na.rm=T), ground_covered=mean(as.integer(ground_covered), na.rm=T)-1) %>% 
@@ -428,17 +493,17 @@ daily_all %>% filter(year(date)>1989, year(date)<2021) %>%
   labs(x="Day of year", y="Mean EPA/NOAA precipiation (mm)", color="Decade", title="Snowmelt and monsoon timing by decade") +
     scale_color_brewer(palette = "Set1", direction = -1) + theme_minimal()
 
-daily_all %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr", EPA_NOAA_filled > 0) %>%   
+daily_filled_7am %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr", EPA_NOAA_filled > 0) %>%   
   mutate(decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>% group_by(decade) %>% 
   ggplot(aes(x=EPA_NOAA_filled, color=decade)) + geom_density() +
     labs(x="EPA/NOAA precipiation (mm)", y="Proportion", color="Decade", title="Intensity spectrum of summer rainstorms > 0 mm") +
       scale_color_brewer(palette = "Set1", direction = -1) + 
   scale_x_continuous(breaks=scales::breaks_extended(10)) + theme_minimal()
 
-summary_EPA_NOAA <- daily_all %>% filter(year(date)>1989, year(date)<2021, EPA_NOAA_filled > 2) %>% 
+summary_EPA_NOAA <- daily_filled_7am %>% filter(year(date)>1989, year(date)<2021, EPA_NOAA_filled > 2) %>% 
   mutate(drought_days = c(0,diff(date)), year=year(date)) %>% filter(ground_covered=="smmr") %>% 
   select(year, date, drought_days) %>% group_by(year) %>% summarize(max_drought_days_2mm = max(drought_days)) %>% 
-  left_join(daily_all %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr") %>% group_by(year=year(date)) %>% 
+  left_join(daily_filled_7am  %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr") %>% group_by(year=year(date)) %>% 
               summarize(rain_days_2mm = sum(EPA_NOAA_filled > 2, na.rm=T),
                         max_precip_mm = max(EPA_NOAA_filled, na.rm=T),
                         total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))

@@ -11,7 +11,7 @@
 
 <meta name="author" content="John Powers" />
 
-<meta name="date" content="2021-04-06" />
+<meta name="date" content="2021-04-07" />
 
 <title>RMBL Weather Data</title>
 
@@ -257,7 +257,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">RMBL Weather Data</h1>
 <h4 class="author"><a href="http://sites.uci.edu/powers/">John Powers</a></h4>
-<h4 class="date">2021-04-06</h4>
+<h4 class="date">2021-04-07</h4>
 
 </div>
 
@@ -289,50 +289,68 @@ maxfield_coords &lt;- data.frame(id = &quot;maxfield&quot;, name=&quot;MaxfieldM
 <p>Weather data from <a href="https://wrcc.dri.edu/rmbl/">7 RMBL stations</a></p>
 <ul>
 <li>Provided by the Western Regional Climate Center, the Desert Research Institute, and the Rocky Mountain Biological Laboratory</li>
-<li>Raw data in metric units (cleaned “FPA” data unavailable) - lots of cleanup needed, no interspersed missing values</li>
+<li>Raw data in metric units (cleaned “FPA” data unavailable) - lots of cleanup needed, no interspersed missing values, so may not have been quality checked at all.</li>
 <li><a href="https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corbil">Downloaded</a> as xls that is actually a tsv, and added quotes around each text cell, and gzipped</li>
-<li>Columns renamed according to /data/WRCC/weather_wrcc_metadata.csv</li>
+<li>Columns renamed according to <a href="data/WRCC/weather_wrcc_metadata.csv">metadata</a></li>
 <li><a href="https://wrcc.dri.edu/cgi-bin/wea_listex.pl?flags">Flags</a> on each column indicate 0 = raw data, (M)issing data, (E)stimated data, (N)on-measuring time interval</li>
-<li>Data for billy’s station runs 2009 - present (valid precip data starts in 2015), other stations run 2009 - 2016 and lack precip but have soil moisture</li>
+<li>Data for billy’s station runs 2009 - present (valid precip data starts 2015-07-01, temperature starts 2015-10-01), other stations run 2009 - 2016 and lack precip but have soil moisture</li>
 <li>Data are provided at 10-min intervals, so took the mean (or sum for precip) to aggregate hourly and then daily results</li>
 <li>Then removed some precipitation entries much greater than 50 mm/day that were interspersed with valid data</li>
+<li><a href="data/WRCC/daily_WRCC.rda">Daily summary RData file</a></li>
 </ul>
 <pre class="r"><code>wrcc_metadata_noflags &lt;- read_tsv(&quot;data/WRCC/weather_wrcc_metadata.tsv&quot;) %&gt;% mutate(index = row_number(), flag=F)
 wrcc_metadata &lt;- bind_rows(wrcc_metadata_noflags, wrcc_metadata_noflags %&gt;% select(name_metric, col_type, index) %&gt;% 
                              filter(! name_metric %in% c(&quot;date&quot;,&quot;time&quot;)) %&gt;% 
   mutate(name_metric=paste0(&quot;flag_&quot;,name_metric), col_type=&quot;f&quot;,flag=T)) %&gt;% arrange(index) %&gt;% fill(id)
 
-#the chunk below loads the WRCC data but is slow
+#the chunk below loads the WRCC data (slow)
 load(&quot;data/WRCC/daily_WRCC.rda&quot;)</code></pre>
 <pre class="r"><code>get_WRCC_id &lt;- function(filename) toupper(str_match(filename, &quot;wrcc_([a-z]+)&quot;)[,2])
 tenmin_WRCC &lt;- list.files(&quot;data/WRCC/&quot;, &quot;.tsv.gz&quot;, full.names=T) %&gt;% set_names(get_WRCC_id(.)) %&gt;% 
   map_dfr( ~ read_tsv(.x, skip = 4, na=c(&quot;&quot;,&quot;M&quot;), col_types=paste0(filter(wrcc_metadata, id==get_WRCC_id(.x))$col_type, collapse=&quot;&quot;),
                       col_names=filter(wrcc_metadata, id==get_WRCC_id(.x))$name_metric), .id=&quot;id&quot;) 
 
-#TODO this comment says to &quot;take the mean of the precip rate per hour that is reported every 10 min&quot;, but the code sums it and that matches well on the monthly scale with other stations
+#this comment says to &quot;take the mean of the precip rate per hour that is reported every 10 min&quot;, but the code sums it and that matches well on the monthly scale with other stations
 hourly_WRCC &lt;- tenmin_WRCC %&gt;% mutate(hour=hour(time)) %&gt;% group_by(id, date, hour) %&gt;% 
   summarize(precip_mm = sum(precip_mm), across(where(is.numeric), mean)) 
 
-daily_WRCC &lt;- hourly_WRCC %&gt;% group_by(id, date) %&gt;% 
+get_daily_WRCC &lt;- function(grouped_hourly_data) {
+  daily &lt;- grouped_hourly_data %&gt;% group_by(id, .add=T) %&gt;% 
   summarize(precip_mm = sum(precip_mm), #sum the hourly precip rates over each 24 hrs 
-            max_av_temp_air_C = max(av_temp_air_C), min_av_temp_air_C = min(av_temp_air_C), across(where(is.numeric), mean)) %&gt;% 
+            max_av_temp_air_C = max(av_temp_air_C), min_av_temp_air_C = min(av_temp_air_C),
+            across(where(is.numeric), mean)) %&gt;% 
   mutate(year=factor(year(date)), julian=yday(date),
-         precip_mm = ifelse(precip_mm&gt;50 | precip_mm &lt; 0, NA, precip_mm)) #cut nonsense precip values &gt;50mm/day or &lt; 0
+         precip_mm = ifelse(precip_mm&gt;50 | precip_mm &lt; 0, NA, precip_mm)) #cut nonsense precip values
+}
+daily_WRCC &lt;- hourly_WRCC %&gt;% group_by(date) %&gt;% get_daily_WRCC()
+daily_WRCC_7am &lt;-  hourly_WRCC %&gt;% filter(id %in% c(&quot;CORBIL&quot;, &quot;CORKET&quot;)) %&gt;% 
+  group_by(date = case_when(hour &lt;  7 ~ date - days(1), hour &gt;= 7 ~ date)) %&gt;% get_daily_WRCC() %&gt;% 
+  select(id, date, year, julian, precip_mm)
 
-save(daily_WRCC, file=&quot;data/WRCC/daily_WRCC.rda&quot;)
-
-#for CORBIL filter(date &gt;= as.Date(&quot;2015-07-01&quot;))#when precip starts to have reasonable values, temp starts 2015-10-01.
-#no missing precip values in CORBIL - may not have been quality checked.</code></pre>
+save(daily_WRCC, daily_WRCC_7am, file=&quot;data/WRCC/daily_WRCC.rda&quot;)</code></pre>
 </div>
 <div id="ess-dive" class="section level2">
 <h2>ESS-DIVE</h2>
-<p>Weather data from the Gold Link station in Mt. Crested Butte</p>
+<p>Weather data from the Gold Link Wunderground station in Mt. Crested Butte</p>
 <ul>
-<li>Data are QAQC’d, gap-filled, and summarized daily.</li>
+<li>Data are QAQC’d, gap-filled, and summarized hourly or daily.</li>
+<li><a href="data/Wunderground/KComCret_metadata.txt">Metadata</a> and <a href="data/Wunderground/Gap_filled_meteorological_data_2011_2020_and.xml">abstract</a></li>
 <li>“This dataset is a gap-filled meteorological dataset (years 2011-2020) that includes modeled potential evapotranspiration from a station near the pumphouse on the East River (KCOMTCRE2 WeatherUnderground) near the top of the ridge at the Pumphouse PLM wells. These datasets are useful as model inputs. The <a href="https://www.wunderground.com/dashboard/pws/KCOMTCRE2/table/2020-12-7/2020-12-7/daily">KOMTCRE2 station</a> is located on Mt. Crested Butte in Colorado. The purpose of this dataset is to use as input to hydrological and flow-reactive transport models as meteorological forcing. One attached file includes metadata files with definitions for all variables and units. Subsequent files include the same time series dataset, but aggregated and gap-filled at different time-stamp intervals. These include 5 minute time-series, 15 minute time-series, 30 minute time-series, 1 hour time-series, daily time-series, and hourly and daily modeled evapotranspiration.”</li>
 <li>Michelle Newcomer and David Brian Rogers. 2020. Gap-filled meteorological data (2011-2020) and modeled potential evapotranspiration data from the KCOMTCRE2 WeatherUnderground weather station, from the East River Watershed, Colorado. ESS-DIVE: Deep Insight for Earth Science Data. <a href="https://doi.org/10.15485/1734790">doi:10.15485/1734790</a>, version: ess-dive-ce2fd798f9d81f5-20201210T030125380.</li>
+<li>The plot compares the daily precip calculatedd from summing the hourly precipitation rates (in mm/min), or taking the maximum daily accumulated precip. These two numbers should be the same but sometimes differ at midnight (PrecipAccum is sometimes nonzero at midnight), and sometimes when the PrecipRate does not bump up the PrecipAccum. Discrepancy might an artifact of the QA/QC applied by the authors.</li>
 </ul>
-<pre class="r"><code>daily_KCOMTCRE2 &lt;- read_csv(&quot;data/Wunderground/2011_2020_KComCret_1day_ETModeled.csv&quot;)</code></pre>
+<pre class="r"><code>hourly_KCOMTCRE2 &lt;- read_csv(&quot;data/Wunderground/2011_2020_KComCret_60min_Measured_QAQC.csv&quot;, guess_max = 3000)
+daily_KCOMTCRE2 &lt;- read_csv(&quot;data/Wunderground/2011_2020_KComCret_1day_ETModeled.csv&quot;)
+
+daily_KCOMTCRE2_7am &lt;- hourly_KCOMTCRE2 %&gt;% 
+  group_by(date = case_when(hr &lt;  7 ~ date - days(1), hr &gt;= 7 ~ date)) %&gt;% 
+  summarize(Precip = sum(PrecipRate)*60) #units are mm/min
+
+daily_KCOMTCRE2_raw &lt;- hourly_KCOMTCRE2 %&gt;% group_by(date) %&gt;% 
+  summarize(Sum_PrecipRate = sum(PrecipRate)*60, Max_PrecipAccum = max(PrecipAccum)) 
+ggplot(daily_KCOMTCRE2_raw) + geom_point(aes(x=Max_PrecipAccum, y=Sum_PrecipRate)) + coord_cartesian(ylim=c(0,50))</code></pre>
+<p><img src="images_weather/Wunderground-1.png" width="672" /></p>
+<pre class="r"><code>#hourly_KCOMTCRE2 %&gt;% filter(date %in% (daily_KCOMTCRE2_raw %&gt;% filter(abs(Max_PrecipAccum - Sum_PrecipRate &gt; 0.01)) %&gt;% #pull(date))) %&gt;% View</code></pre>
 </div>
 <div id="epa-castnet" class="section level2">
 <h2>EPA CASTNET</h2>
@@ -351,217 +369,11 @@ save(daily_WRCC, file=&quot;data/WRCC/daily_WRCC.rda&quot;)
                           col_types=cols(DATE_TIME=col_datetime(&quot;%m/%d/%Y %H:%M:%S&quot;), QA_CODE=col_character()))
 
 # Tally and plot missing hourly values
-hourly_GTH161_missing &lt;- hourly_GTH161 %&gt;% group_by(date=date(DATE_TIME)) %&gt;% 
-  filter(date &lt; ymd(&quot;2012-01-01&quot;)) %&gt;% summarize(missing_precip_hrs = sum(is.na(PRECIPITATION)))
-ggplot(hourly_GTH161_missing, aes(x=date, y=missing_precip_hrs)) + geom_point()</code></pre>
+hourly_GTH161_missing &lt;- hourly_GTH161 %&gt;% filter(DATE_TIME &lt; ymd(&quot;2012-01-01&quot;)) %&gt;% 
+  group_by(date=date(DATE_TIME)) %&gt;% summarize(missing_precip_hrs = sum(is.na(PRECIPITATION)))
+ggplot(hourly_GTH161_missing, aes(x=date, y=missing_precip_hrs)) + geom_point() + 
+  geom_text(data = hourly_GTH161_missing %&gt;% count(missing_precip_hrs), aes(x=ymd(&quot;1988-01-01&quot;), label=n))</code></pre>
 <p><img src="images_weather/EPA_CASTNET-1.png" width="672" /></p>
-<pre class="r"><code>table(hourly_GTH161_missing$missing_precip_hrs) %&gt;% as.data.frame %&gt;% rename(missing_hours=Var1, num_days=Freq) %&gt;% kable</code></pre>
-<table>
-<thead>
-<tr>
-<th style="text-align:left;">
-missing_hours
-</th>
-<th style="text-align:right;">
-num_days
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left;">
-0
-</td>
-<td style="text-align:right;">
-7288
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-511
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-2
-</td>
-<td style="text-align:right;">
-126
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-3
-</td>
-<td style="text-align:right;">
-36
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-4
-</td>
-<td style="text-align:right;">
-32
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-5
-</td>
-<td style="text-align:right;">
-20
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-6
-</td>
-<td style="text-align:right;">
-15
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-7
-</td>
-<td style="text-align:right;">
-19
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-8
-</td>
-<td style="text-align:right;">
-7
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-9
-</td>
-<td style="text-align:right;">
-8
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-10
-</td>
-<td style="text-align:right;">
-14
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-11
-</td>
-<td style="text-align:right;">
-9
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-12
-</td>
-<td style="text-align:right;">
-4
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-13
-</td>
-<td style="text-align:right;">
-8
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-14
-</td>
-<td style="text-align:right;">
-5
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-15
-</td>
-<td style="text-align:right;">
-2
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-16
-</td>
-<td style="text-align:right;">
-8
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-17
-</td>
-<td style="text-align:right;">
-3
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-18
-</td>
-<td style="text-align:right;">
-2
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-19
-</td>
-<td style="text-align:right;">
-1
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-20
-</td>
-<td style="text-align:right;">
-3
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-21
-</td>
-<td style="text-align:right;">
-1
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-22
-</td>
-<td style="text-align:right;">
-1
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-24
-</td>
-<td style="text-align:right;">
-96
-</td>
-</tr>
-</tbody>
-</table>
 <pre class="r"><code># daily_GTH161 is used for daily_all, but 
 # this keeps precip sums when there is missing hourly values
 # an entire day missing gets precip = 0 and temperature = NaN
@@ -573,9 +385,9 @@ daily_GTH161_NA &lt;- hourly_GTH161 %&gt;% arrange(DATE_TIME) %&gt;% group_by(da
     summarize(tavg_C=mean(TEMPERATURE), tmax_C=max(TEMPERATURE), tmin_C=min(TEMPERATURE), 
               prcp_mm = sum(PRECIPITATION), across(where(is.numeric), mean)) 
 # Could be customized to accept a few missing hours with maxNA:
-summarizeNA &lt;- function(x, fun, maxNA = 0) {
-  ifelse(sum(is.na(x)) &lt;= maxNA, fun(x, na.rm=T), NA)
-}              
+#summarizeNA &lt;- function(x, fun, maxNA = 0) {
+#  ifelse(sum(is.na(x)) &lt;= maxNA, fun(x, na.rm=T), NA)
+#}              
               
 # daily_GTH161_NA_7am counts precipitation occurring BEFORE 7 am as the previous day, to  
 # line up with CoCoRaHs datasets that I shifted one day back
@@ -589,11 +401,13 @@ daily_GTH161_NA_7am &lt;- hourly_GTH161 %&gt;% arrange(DATE_TIME) %&gt;%
 <h2>NOAA</h2>
 <p>Weather data from 7 stations near RMBL sourced from <a href="https://www.ncdc.noaa.gov/data-access/land-based-station-data/land-based-datasets/global-historical-climatology-network-ghcn">NOAA’s GHCN Daily dataset</a>.</p>
 <ul>
-<li>All stations within 10 km of MAxfield Meadow near Gothic</li>
+<li>All stations within 10 km of Maxfield Meadow near Gothic</li>
 <li>Daily summaries quality checked by GHCN</li>
-<li>Includes Crested Butte (1909-present), Schofield Pass (1985-present), Butte (1980-present)</li>
-<li>Stations beginning with US1COGN (Colorado-Gunnison County) are <a href="https://www.cocorahs.org/Stations/ListStations.aspx">community CoCoRaHS stations</a>, including <a href="https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail">billy barr’s</a> <a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-18">station in Gothic</a>. Unlike some the other datasets, the reported precipitation is from 7 am the previous day to 7 am that day, according to <a href="https://www.cocorahs.org/ViewData/ListDailyPrecipReports.aspx">CoCoRaHS</a>. For some stations, it ranges from 6:30-8am.</li>
-<li>To handle this discrepancy coarsely, the date is set to the day before on CoCoRaHS stations, since 17/24 hr are from day prior, and most summer precipitation is in the afternoon. The better method is to change the time frames of an hourly dataset they are compared against (see below)</li>
+<li>Includes long records from Crested Butte (1909-present), Schofield Pass (1985-present), Butte (1980-present)</li>
+<li>The Crested Butte station precip is <a href="https://www.ncdc.noaa.gov/homr/#ncdcstnid=20003581&amp;tab=PHR">collected at 9:00 am</a>, but the collection time is unknown for Schofield Pass and Butte, which are probably automated (midnight-midnight)</li>
+<li>Stations beginning with US1COGN (Colorado-Gunnison County) are <a href="https://www.cocorahs.org/Stations/ListStations.aspx">community CoCoRaHS stations</a>, including <a href="https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:US1COGN0018/detail">billy barr’s</a> <a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-18">station in Gothic</a>. Unlike some the other datasets, the reported precipitation is from 7 am the previous day to 7 am that day, according to <a href="https://www.cocorahs.org/ViewData/ListDailyPrecipReports.aspx">CoCoRaHS</a>. For some stations, it ranges from 6:30-8:00 am.</li>
+<li>To handle this discrepancy coarsely, the date is set to the day before on CoCoRaHS stations and NOAA Crested Butte, since most hours of precip are from day prior, and most summer precipitation is in the afternoon.</li>
+<li>Then in compared hourly datasets (EPA, WRCC, ESSDIVE), the date is set to the day prior for precip collected before 7 am.</li>
 </ul>
 <pre class="r"><code>library(rnoaa)
 station_data &lt;- ghcnd_stations()# long download unless cached
@@ -603,13 +417,13 @@ NOAA_stations &lt;- meteo_nearby_stations(lat_lon_df = maxfield_coords, station_
   mutate(CoCoRaHS = str_sub(id,1,3) == &quot;US1&quot;)
 remove(station_data)
 NOAA_stations_name &lt;- with(NOAA_stations, set_names(name, id))
-NOAA_stations_CoCoRaHS &lt;- NOAA_stations %&gt;% filter(CoCoRaHS) %&gt;% pull(id)
+NOAA_stations_morning &lt;- NOAA_stations %&gt;% filter(CoCoRaHS) %&gt;% pull(id) %&gt;% c(&quot;USC00051959&quot;) #Crested Butte is collected in the morning too, at 9am
 
 daily_NOAA &lt;- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %&gt;% 
   mutate(across(contains(&quot;flag&quot;), as.factor)) %&gt;% #All units are in tenths of mm, converted to mm here.
   mutate(across(c(&quot;prcp&quot;,&quot;snow&quot;,&quot;snwd&quot;,&quot;wesd&quot;,&quot;wesf&quot;), ~ as.integer(.x)/10, .names=&quot;{.col}_mm&quot;), .keep=&quot;unused&quot;) %&gt;% 
   mutate(across(c(&quot;tmin&quot;,&quot;tavg&quot;,&quot;tmax&quot;), ~ as.integer(.x)/10, .names=&quot;{.col}_C&quot;), .keep=&quot;unused&quot;) %&gt;% 
-  mutate(date = case_when(id %in% NOAA_stations_CoCoRaHS ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am, so set them back a day</code></pre>
+  mutate(date = case_when(id %in% NOAA_stations_morning ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am, so set them back a day</code></pre>
 </div>
 <div id="cocorahs" class="section level2">
 <h2>CoCoRaHS</h2>
@@ -617,19 +431,23 @@ daily_NOAA &lt;- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %&gt;%
 <ul>
 <li>The NOAA dataset includes a few of these stations</li>
 <li>Daily reports exported from directly from <a href="http://data.cocorahs.org/cocorahs/export/exportmanager.aspx">CoCoRaHS</a> for <a href="http://data.cocorahs.org/export/exportreports.aspx?ReportType=Daily&amp;dtf=1&amp;Format=CSV&amp;State=CO&amp;County=GN&amp;ReportDateType=reportdate&amp;StartDate=4/6/2000&amp;EndDate=4/6/2021&amp;TimesInGMT=False">Gunnison County, CO since 2000</a></li>
+<li>Plots of data coverage and observation times, table of currently active stations</li>
+<li>See complete <a href="data/NOAA_GHCN/CoCoRaHS_Stations_CO_GN.tsv">Gunnison County station list</a></li>
 </ul>
 <pre class="r"><code>daily_CoCoRaHS &lt;- read_csv(&quot;data/NOAA_GHCN/CoCoRaHS_DailyPrecipReports_CO_GN.csv&quot;, guess_max=1e4) %&gt;% 
-  mutate(across(TotalPrecipAmt:TotalSnowSWE, as.numeric),# sets &quot;trace&quot; measurements (T) to NA
+  mutate(across(TotalPrecipAmt:TotalSnowSWE, ~25.4*as.numeric(.x)),# T(race) to NA, convert inches to mm
          across(starts_with(&quot;Station&quot;), factor)) 
 
 ggplot(daily_CoCoRaHS, aes(x=ObservationDate, y=StationName, fill=TotalPrecipAmt)) + geom_tile()</code></pre>
 <p><img src="images_weather/cocorahs-1.png" width="672" /></p>
 <pre class="r"><code>ggplot(daily_CoCoRaHS, aes(x=ObservationTime, y=StationName)) + geom_point(shape=1, alpha=0.2)</code></pre>
 <p><img src="images_weather/cocorahs-2.png" width="672" /></p>
-<pre class="r"><code>daily_CoCoRaHS %&gt;% group_by(StationName, StationNumber) %&gt;% summarize(across(c(Latitude, Longitude), unique)) %&gt;% 
-  left_join(read_tsv(&quot;data/NOAA_GHCN/CoCoRaHS_Stations_CO_GN.tsv&quot;)) %&gt;% 
-  mutate(StationNumber = cell_spec(StationNumber, &quot;html&quot;, link = Link), .keep=&quot;unused&quot;) %&gt;%
-  select(-c(Type, State, County, OldStationNumber)) %&gt;% 
+<pre class="r"><code>CoCoRaHS_stations &lt;- daily_CoCoRaHS %&gt;% group_by(StationName, StationNumber) %&gt;% 
+  summarize(across(c(Latitude, Longitude), unique), medianObservationTime=median(ObservationTime)) %&gt;% 
+  left_join(read_tsv(&quot;data/NOAA_GHCN/CoCoRaHS_Stations_CO_GN.tsv&quot;)) 
+
+CoCoRaHS_stations %&gt;% mutate(StationNumber = cell_spec(StationNumber, &quot;html&quot;, link = Link), .keep=&quot;unused&quot;) %&gt;%
+  select(-c(Type, State, County, OldStationNumber)) %&gt;% filter(Active==&quot;Yes&quot;) %&gt;% 
   kable(&quot;html&quot;, escape = FALSE) %&gt;%  kable_styling(bootstrap_options = c(&quot;hover&quot;, &quot;condensed&quot;)) </code></pre>
 <table class="table table-hover table-condensed" style="margin-left: auto; margin-right: auto;">
 <thead>
@@ -647,62 +465,14 @@ Latitude
 Longitude
 </th>
 <th style="text-align:left;">
+medianObservationTime
+</th>
+<th style="text-align:left;">
 Active
 </th>
 </tr>
 </thead>
 <tbody>
-<tr>
-<td style="text-align:left;">
-Almont 0.8 WSW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-53" style="     ">CO-GN-53</a>
-</td>
-<td style="text-align:right;">
-38.66397
-</td>
-<td style="text-align:right;">
--106.8435
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Almont 11 NE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-11" style="     ">CO-GN-11</a>
-</td>
-<td style="text-align:right;">
-38.74531
-</td>
-<td style="text-align:right;">
--106.7140
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Almont 5.6 NNW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-32" style="     ">CO-GN-32</a>
-</td>
-<td style="text-align:right;">
-38.74583
-</td>
-<td style="text-align:right;">
--106.8567
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
 <tr>
 <td style="text-align:left;">
 Cimarron 11.2 S
@@ -717,41 +487,10 @@ Cimarron 11.2 S
 -107.5550
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Cimmaron 13.0 SE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-57" style="     ">CO-GN-57</a>
-</td>
-<td style="text-align:right;">
-38.33328
-</td>
-<td style="text-align:right;">
--107.3619
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Crested Butte 0.5 ENE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-20" style="     ">CO-GN-20</a>
-</td>
-<td style="text-align:right;">
-38.87220
-</td>
-<td style="text-align:right;">
--106.9780
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -766,6 +505,9 @@ Crested Butte 0.5 ESE
 </td>
 <td style="text-align:right;">
 -106.9741
+</td>
+<td style="text-align:left;">
+08:00:00
 </td>
 <td style="text-align:left;">
 Yes
@@ -785,41 +527,10 @@ Crested Butte 1.9 NNE
 -106.9685
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Crested Butte 3.6 SE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-31" style="     ">CO-GN-31</a>
-</td>
-<td style="text-align:right;">
-38.83603
-</td>
-<td style="text-align:right;">
--106.9327
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Crested Butte 5.8 SE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-35" style="     ">CO-GN-35</a>
-</td>
-<td style="text-align:right;">
-38.81317
-</td>
-<td style="text-align:right;">
--106.9027
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -834,6 +545,9 @@ Crested Butte 6.2 N
 </td>
 <td style="text-align:right;">
 -106.9908
+</td>
+<td style="text-align:left;">
+07:00:00
 </td>
 <td style="text-align:left;">
 Yes
@@ -853,6 +567,9 @@ Crested Butte 6.3 W
 -107.0998
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
 </td>
 </tr>
@@ -868,6 +585,9 @@ Doyleville 2.1 W
 </td>
 <td style="text-align:right;">
 -106.6192
+</td>
+<td style="text-align:left;">
+08:00:00
 </td>
 <td style="text-align:left;">
 Yes
@@ -887,58 +607,10 @@ Gunnison 0.2 NW
 -106.9296
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 0.2 SE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-28" style="     ">CO-GN-28</a>
-</td>
-<td style="text-align:right;">
-38.54300
-</td>
-<td style="text-align:right;">
--106.9243
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 0.3 SW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-27" style="     ">CO-GN-27</a>
-</td>
-<td style="text-align:right;">
-38.54247
-</td>
-<td style="text-align:right;">
--106.9312
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 0.7 NNW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-17" style="     ">CO-GN-17</a>
-</td>
-<td style="text-align:right;">
-38.55420
-</td>
-<td style="text-align:right;">
--106.9321
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -953,6 +625,9 @@ Gunnison 0.8 N
 </td>
 <td style="text-align:right;">
 -106.9286
+</td>
+<td style="text-align:left;">
+08:00:00
 </td>
 <td style="text-align:left;">
 Yes
@@ -972,75 +647,10 @@ Gunnison 0.8 NNW
 -106.9238
 </td>
 <td style="text-align:left;">
+08:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 0.8 W
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-36" style="     ">CO-GN-36</a>
-</td>
-<td style="text-align:right;">
-38.54442
-</td>
-<td style="text-align:right;">
--106.9414
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 1.7 W
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-15" style="     ">CO-GN-15</a>
-</td>
-<td style="text-align:right;">
-38.54260
-</td>
-<td style="text-align:right;">
--106.9462
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 12.4 NNW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-48" style="     ">CO-GN-48</a>
-</td>
-<td style="text-align:right;">
-38.69685
-</td>
-<td style="text-align:right;">
--107.0489
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 13.8 NNW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-44" style="     ">CO-GN-44</a>
-</td>
-<td style="text-align:right;">
-38.73059
-</td>
-<td style="text-align:right;">
--107.0226
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -1057,109 +667,10 @@ Gunnison 2.8 NNE
 -106.9031
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 2.9 S
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-34" style="     ">CO-GN-34</a>
-</td>
-<td style="text-align:right;">
-38.50357
-</td>
-<td style="text-align:right;">
--106.9360
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 22.0 SE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-46" style="     ">CO-GN-46</a>
-</td>
-<td style="text-align:right;">
-38.42531
-</td>
-<td style="text-align:right;">
--106.5505
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 3.1 N
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-12" style="     ">CO-GN-12</a>
-</td>
-<td style="text-align:right;">
-38.59080
-</td>
-<td style="text-align:right;">
--106.9358
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 3.2 N
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-19" style="     ">CO-GN-19</a>
-</td>
-<td style="text-align:right;">
-38.59220
-</td>
-<td style="text-align:right;">
--106.9213
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 3.3 NW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-16" style="     ">CO-GN-16</a>
-</td>
-<td style="text-align:right;">
-38.57790
-</td>
-<td style="text-align:right;">
--106.9718
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 5.1 N
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-33" style="     ">CO-GN-33</a>
-</td>
-<td style="text-align:right;">
-38.61825
-</td>
-<td style="text-align:right;">
--106.9284
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -1176,58 +687,10 @@ Gunnison 6.6 N
 -106.9408
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 7.9 N
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-43" style="     ">CO-GN-43</a>
-</td>
-<td style="text-align:right;">
-38.65722
-</td>
-<td style="text-align:right;">
--106.9527
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 7.9 WSW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-14" style="     ">CO-GN-14</a>
-</td>
-<td style="text-align:right;">
-38.50250
-</td>
-<td style="text-align:right;">
--107.0611
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Gunnison 9.7 ESE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-29" style="     ">CO-GN-29</a>
-</td>
-<td style="text-align:right;">
-38.51306
-</td>
-<td style="text-align:right;">
--106.7520
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -1244,41 +707,10 @@ Lake City 8.5 N
 -107.2982
 </td>
 <td style="text-align:left;">
+08:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Marble .9 N
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-2" style="     ">CO-GN-2</a>
-</td>
-<td style="text-align:right;">
-39.08020
-</td>
-<td style="text-align:right;">
--107.1889
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Marble 0.2 W
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-26" style="     ">CO-GN-26</a>
-</td>
-<td style="text-align:right;">
-39.07169
-</td>
-<td style="text-align:right;">
--107.1922
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -1295,58 +727,10 @@ Marble 0.5 NNW
 -107.1906
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Marble 1.0 WNW
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-65" style="     ">CO-GN-65</a>
-</td>
-<td style="text-align:right;">
-39.07517
-</td>
-<td style="text-align:right;">
--107.2067
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Marble 1.5 W
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-55" style="     ">CO-GN-55</a>
-</td>
-<td style="text-align:right;">
-39.07232
-</td>
-<td style="text-align:right;">
--107.2170
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Mount Crested Butte 0.3 ENE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-30" style="     ">CO-GN-30</a>
-</td>
-<td style="text-align:right;">
-38.91031
-</td>
-<td style="text-align:right;">
--106.9623
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -1361,6 +745,9 @@ Parlin 2.7 ESE
 </td>
 <td style="text-align:right;">
 -106.6742
+</td>
+<td style="text-align:left;">
+07:00:00
 </td>
 <td style="text-align:left;">
 Yes
@@ -1380,24 +767,10 @@ Pitkin 1.1 SW
 -106.5313
 </td>
 <td style="text-align:left;">
+07:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Pitkin 8.0 ESE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-23" style="     ">CO-GN-23</a>
-</td>
-<td style="text-align:right;">
-38.55290
-</td>
-<td style="text-align:right;">
--106.3870
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 <tr>
@@ -1414,92 +787,10 @@ Powderhorn 4.4 NNE
 -107.0943
 </td>
 <td style="text-align:left;">
+08:00:00
+</td>
+<td style="text-align:left;">
 Yes
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Powderhorn 5.1 N
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-45" style="     ">CO-GN-45</a>
-</td>
-<td style="text-align:right;">
-38.35390
-</td>
-<td style="text-align:right;">
--107.1174
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Powderhorn 7.5 W
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-42" style="     ">CO-GN-42</a>
-</td>
-<td style="text-align:right;">
-38.25899
-</td>
-<td style="text-align:right;">
--107.2549
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Sapinero 6.7 S
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-63" style="     ">CO-GN-63</a>
-</td>
-<td style="text-align:right;">
-38.33442
-</td>
-<td style="text-align:right;">
--107.3573
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Sargents 3.1 NNE
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-61" style="     ">CO-GN-61</a>
-</td>
-<td style="text-align:right;">
-38.44371
-</td>
-<td style="text-align:right;">
--106.4073
-</td>
-<td style="text-align:left;">
-No
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Somerset 12.5 N
-</td>
-<td style="text-align:left;">
-<a href="https://www.cocorahs.org/Stations/Station.aspx?StationNumber=CO-GN-62" style="     ">CO-GN-62</a>
-</td>
-<td style="text-align:right;">
-39.09792
-</td>
-<td style="text-align:right;">
--107.3935
-</td>
-<td style="text-align:left;">
-No
 </td>
 </tr>
 </tbody>
@@ -1523,55 +814,78 @@ gsodr.inventory &lt;- get_inventory() %&gt;% #long download
 <pre class="r"><code>groundcover &lt;- read_tsv(&quot;./data/gothicwx/groundcover.tsv&quot;) %&gt;% 
   mutate(across(starts_with(&quot;first&quot;), list(day=yday)), year=year(first_0_cm))
 
-first_snow_2020 &lt;- as.POSIXct(c(&quot;2020-10-25&quot;, &quot;2020-12-31&quot;), tz=&quot;UTC&quot;) #TODO check this first permanent snow of 2020 (not yet on billy&#39;s website)</code></pre>
+groundcover_2021 &lt;- tibble(first_snow=ymd(&quot;2020-10-25&quot;), first_0_cm=ymd(&quot;2021-05-01&quot;)) 
+#TODO check this first permanent snow of 2020 (not yet on billy&#39;s website), and fill in actual value for first_0_cm
+
+get_seasons &lt;- function(dates) { 
+  factor(c(&quot;smmr&quot;,&quot;wntr&quot;))[ifelse(year(dates) &lt; min(groundcover$year), NA, 
+         1+dates %in% do.call(c, 
+                             map2(bind_rows(groundcover, groundcover_2021)$first_snow, 
+                                  bind_rows(groundcover, groundcover_2021)$first_0_cm, 
+                                  ~ seq(date(.x), date(.y), by=&quot;day&quot;))))]
+}</code></pre>
 </div>
 <div id="combine-datasets" class="section level2">
 <h2>Combine datasets</h2>
 <p>Combine selected daily weather station data in long or wide format.</p>
-<pre class="r"><code>#Combine all the weather stations daily precip and temperature statistics in long format
-daily_long &lt;- bind_rows( 
-  GTH161 = daily_GTH161_NA %&gt;% select(date, tavg_C, tmax_C, tmin_C, prcp_mm),
-  KCOMTCRE2 = daily_KCOMTCRE2 %&gt;% select(date, tavg_C = Tmean, tmax_C = Tmax, tmin_C = Tmin, prcp_mm = Precip),
-  .id=&quot;id&quot;) %&gt;% 
-  bind_rows(daily_WRCC %&gt;% select(id, date, 
-                                  tavg_C = av_temp_air_C, tmax_C = max_av_temp_air_C, tmin_C = min_av_temp_air_C,
-                                  prcp_mm = precip_mm)) %&gt;%  
-  bind_rows(daily_NOAA %&gt;% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %&gt;% mutate(id=factor(id))
-
-#Combine a few of the closer weather station precipitation datasets and snowmelt in wide format
-daily_all &lt;- daily_NOAA %&gt;% filter(id == &quot;US1COGN0018&quot;) %&gt;% 
+<pre class="r"><code>#Combine a few of the closer weather station precipitation datasets and snowmelt in wide format
+daily_all &lt;- 
+  daily_NOAA %&gt;% filter(id == &quot;US1COGN0018&quot;) %&gt;% 
   full_join(daily_GTH161) %&gt;% full_join(daily_KCOMTCRE2) %&gt;% 
   full_join(daily_WRCC %&gt;% filter(id==&quot;CORBIL&quot;), by=&quot;date&quot;) %&gt;% 
   rename(EPA_RsrchMdw=PRECIPITATION, ESSDIVE_GoldLink=Precip, WRCC_billy=precip_mm, NOAA_billy=prcp_mm) %&gt;% 
   mutate(yr = year(date), mo = month(date, label=F),
-         ground_covered = factor(c(&quot;smmr&quot;,&quot;wntr&quot;))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by=&quot;day&quot;)))]) 
+         ground_covered = get_seasons(date)) %&gt;% filter(year(date) &lt; 2021)
 
-# The datasets summarized to line up with the NOAA CoCoRaHS time window, in wide format
-daily_all_7am &lt;- daily_GTH161_NA_7am %&gt;% select(date, prcp_mm) %&gt;% mutate(id=&quot;GTH161&quot;) %&gt;% 
-  bind_rows(daily_NOAA %&gt;% select(id, date, prcp_mm) %&gt;% filter(id %in% NOAA_stations_CoCoRaHS)) %&gt;% 
-  pivot_wider(names_from=&quot;id&quot;, values_from=&quot;prcp_mm&quot;) %&gt;% arrange(date) %&gt;% 
-  rename(NOAA_billy=&quot;US1COGN0018&quot;, EPA_RsrchMdw=&quot;GTH161&quot;) %&gt;% 
-  mutate(ground_covered = factor(c(&quot;smmr&quot;,&quot;wntr&quot;))[1+date %in% do.call(c, map2(c(groundcover$first_snow, first_snow_2020[1]), c(groundcover$first_0_cm, first_snow_2020[2]), ~ seq(date(.x), date(.y), by=&quot;day&quot;)))]) </code></pre>
-<p>Fill in EPA CASTNET data since 2011 with NOAA precip from billy’s NOAA station in Gothic.</p>
-<ul>
-<li>TODO: Need to redo this with the EPA data summed from 7 am to 7 am.</li>
-<li>Uses a simple linear model for their period of overlap, forced through zero</li>
-<li>Fit separately for summer vs. winter (determined by billy’s groundcover data)</li>
-<li>See the regressions under <a href="#daily-precip-1989-present">daily precip 1989-present</a></li>
-</ul>
-<pre class="r"><code>#correlate daily EPA_RsrchMdw and NOAA_billy to predict what EPA would look like for 2012-2020
-EPA_NOAA_daily_model &lt;-  lm(EPA_RsrchMdw ~ NOAA_billy:ground_covered+0, data=daily_all)
+#Combine all the weather stations daily precip and temperature statistics in long format
+daily_long &lt;- bind_rows( 
+  GTH161 = daily_GTH161_NA %&gt;% select(date, tavg_C, tmax_C, tmin_C, prcp_mm),
+  KCOMTCRE2 = daily_KCOMTCRE2 %&gt;% select(date, tavg_C = Tmean, tmax_C = Tmax, tmin_C = Tmin, prcp_mm = Precip),
+  .id=&quot;id&quot;) %&gt;% 
+  bind_rows(daily_WRCC %&gt;% select(id, date, tavg_C = av_temp_air_C, 
+                                  tmax_C = max_av_temp_air_C, tmin_C = min_av_temp_air_C, 
+                                  prcp_mm = precip_mm)) %&gt;%  
+  bind_rows(daily_NOAA %&gt;% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %&gt;% mutate(id=factor(id))%&gt;% filter(year(date) &lt; 2021)
+
+# The datasets summarized to line up with the morning collections
+daily_long_7am &lt;- bind_rows( 
+  GTH161 = daily_GTH161_NA_7am %&gt;% select(date, prcp_mm),
+  KCOMTCRE2 = daily_KCOMTCRE2_7am %&gt;% select(date, prcp_mm = Precip), .id=&quot;id&quot;) %&gt;% 
+  bind_rows(daily_WRCC_7am %&gt;% select(id, date, prcp_mm = precip_mm)) %&gt;%  
+  bind_rows(daily_NOAA %&gt;% select(id, date, prcp_mm)) %&gt;% # morning stations shifted back a day
+  mutate(ground_covered = get_seasons(date)) %&gt;% filter(year(date) &lt; 2021)
+
+daily_all_7am &lt;- daily_long_7am %&gt;% 
+  pivot_wider(names_from=&quot;id&quot;, values_from=&quot;prcp_mm&quot;) %&gt;% arrange(date)</code></pre>
+<div id="fill-in-epa-castnet-data" class="section level3">
+<h3>Fill in EPA CASTNET data</h3>
+<p>EPA precip data from the Research Meadow ends in 2011, so fill in with from billy’s NOAA/CoCoRaHs station in Gothic. * Sum the EPA precipitation data (GTH161) from 7 am to 7 am to match CoCoRaHs period, and count hours before 7am as the previous day * Uses a simple linear model for their period of overlap, forced through zero * Fit separately for summer vs. winter (determined by billy’s groundcover data) * billy’s data fills gaps from 2012-present, and small gaps from 2004-2011 (US1COGN0018, summer r = 0.90) * Before that (1989-2004), small gaps are filled with a similar regression to the NOAA Crested Butte station (USC00051959, summer r = 0.75)</p>
+<pre class="r"><code>EPA_billy_daily_model &lt;-  lm(GTH161 ~ US1COGN0018:ground_covered+0, data=daily_all_7am)
+EPA_CB_daily_model &lt;-     lm(GTH161 ~ USC00051959:ground_covered+0, data=daily_all_7am)
+
+daily_filled_7am &lt;- daily_all_7am %&gt;% 
+  mutate(EPA_NOAA_source = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), &quot;NOAA_billy&quot;, 
+                                                               ifelse(!is.na(USC00051959), &quot;NOAA_CB&quot;, NA)), &quot;EPA&quot;) %&gt;% factor,
+         EPA_NOAA_filled = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), predict(EPA_billy_daily_model),
+                                                        ifelse(!is.na(USC00051959), predict(EPA_CB_daily_model), NA)), GTH161))
+save(daily_filled_7am, file=&quot;data/daily_all.rda&quot;)
+
+monthly_filled_7am &lt;- daily_filled_7am %&gt;% group_by(yr = year(date), mo = month(date)) %&gt;% 
+  summarize(across(-c(date, ground_covered, EPA_NOAA_source), ~ ifelse(sum(is.na(.x))&gt;5, NA, sum(.x, na.rm=T))), .groups=&quot;drop&quot;) %&gt;%
+  arrange(yr, mo)
 #EPA_NOAA_monthly_model &lt;-lm(EPA_RsrchMdw ~ NOAA_billy*season, data=monthly_all %&gt;% 
 #mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]))
-daily_all &lt;- daily_all %&gt;% 
-  mutate(EPA_predicted = is.na(EPA_RsrchMdw) &amp; !is.na(NOAA_billy),
-         EPA_NOAA_filled = ifelse(is.na(EPA_RsrchMdw), predict(EPA_NOAA_daily_model, newdata=daily_all), EPA_RsrchMdw))
 
-stations &lt;- c(&quot;EPA_NOAA_filled&quot;, &quot;EPA_RsrchMdw&quot;,&quot;ESSDIVE_GoldLink&quot;,&quot;WRCC_billy&quot;,&quot;NOAA_billy&quot;)
-monthly_all &lt;- daily_all %&gt;% group_by(yr, mo) %&gt;% 
-  summarize(across(all_of(stations), ~ ifelse(sum(is.na(.x))&gt;5, NA, sum(.x, na.rm=T))), .groups=&quot;drop&quot;) %&gt;% arrange(yr, mo) 
-
-save(daily_all, file=&quot;data/daily_all.rda&quot;)</code></pre>
+ggplot(daily_filled_7am %&gt;% mutate(year=year(date)) %&gt;% filter(year&gt;=1989), aes(x=yday(date))) + 
+  facet_wrap(vars(year)) + 
+  geom_line(aes(y=40-10*as.integer(ground_covered))) + 
+  geom_point(aes(y=EPA_NOAA_filled, color=EPA_NOAA_source), size=0.5) + 
+  guides(color=guide_legend(override.aes = list(size=3)))+
+  labs(x=&quot;Day of year&quot;, y=&quot;EPA/NOAA precipiation (mm)&quot;, color=&quot;Filled from&quot;) + 
+  theme_minimal() + theme(legend.position=&quot;top&quot;, panel.spacing = unit(0,&quot;pt&quot;), 
+                          panel.grid.minor=element_blank(), panel.grid.major.x=element_blank())</code></pre>
+<p><img src="images_weather/EPA_NOAA_fill-1.png" width="672" /></p>
+</div>
 </div>
 </div>
 <div id="stations" class="section level1">
@@ -2196,53 +1510,66 @@ autoplot(map.latlon) +
   theme_minimal() + theme(legend.position = &quot;top&quot;)</code></pre>
 <p><img src="images_weather/coverage-2.png" width="672" /></p>
 </div>
-<div id="daily-precip-1989-present" class="section level1">
-<h1>Daily precip 1989-present</h1>
-<p>Compare precipitation data from the following <a href="#stations">sources</a>:</p>
+<div id="compare-daily-precip" class="section level1">
+<h1>Compare daily precip</h1>
+<p>Compare summer precipitation data across <a href="#stations">stations</a>.</p>
 <ul>
-<li>EPA Research Meadow (1989-2011)</li>
-<li>billy’s NOAA station in Gothic, CRESTED BUTTE 6.2 N, enrolled in CoCoRaHS (2004-present)</li>
-<li>The EPA Research Meadow data extended with billy’s NOAA station (EPA/NOAA, 1989-present)</li>
-<li>billy’s data on WRCC (2015-present), does not match his NOAA data (likely because of different summation windows)</li>
-<li>Mt. Crested Butte Gold Link station cleaned by ESSDIVE (2011-2020)</li>
+<li>The correlation plots show how precipitation measurements are correlated on the daily scale, after shifting the stations with morning collections back a day and grouping measurements in the hourly datasets before 7 am to the previous day.</li>
+<li>Only summer data is shown in the correlation plot, as determined by billy’s gothicwx groundcover data.</li>
+<li>View the <a href="%22images_weather/corrplot_7am.pdf%22">full correlation plot matrix</a> to compare all the stations.</li>
 </ul>
-<p>The correlation plots show how precipitation measurements are correlated on the daily scale. Since the NOAA_billy data from CoCoRaHS is shifted back a day (collected at 7 am the next day), it doesn’t match up with the WRCC_billy data (or correlate well with the other stations), which are summed from midnight to midnight. Taking the <a href="#monthly-precip-1989-present">monthly</a> sum makes them almost match.</p>
-<pre class="r"><code>ggplot(daily_all %&gt;% filter(year(date) %in% 2018:2020), aes(y=EPA_NOAA_filled, x=yday(date))) + geom_col(aes(fill=ground_covered)) + 
-  facet_wrap(vars(year(date)), ncol=1) + labs(x=&quot;Day of year&quot;, y=&quot;EPA/NOAA precipiation (mm)&quot;, fill=&quot;Snow cover&quot;)</code></pre>
-<p><img src="images_weather/weather_daily-1.png" width="672" /></p>
-<pre class="r"><code>daily_all %&gt;% pivot_longer(unname(stations), names_to=&quot;station&quot;, values_to=&quot;precipitation_mm&quot;) %&gt;% 
+<pre class="r"><code>daily_long_7am %&gt;% mutate(yr = year(date)) %&gt;% 
   filter(yday(date) &gt;100, yday(date) &lt; 240, yr %in% 2018:2020) %&gt;%
-  ggplot(aes(x=yday(date), y=precipitation_mm, color=station, shape=ground_covered)) +  
-  geom_point() + facet_wrap(vars(yr), ncol=1) + theme(legend.position = &quot;top&quot;, legend.direction=&quot;vertical&quot;) +
-  labs(x=&quot;Day of year&quot;, y = &quot;Precipitation (mm)&quot;, color=&quot;Station&quot;, shape=&quot;Snow cover&quot;)</code></pre>
+  ggplot(aes(x=yday(date), y=prcp_mm, color=stations_name[id], shape=ground_covered)) +  
+  geom_point() + facet_wrap(vars(yr), ncol=1) + scale_color_manual(values=stations_pal) + 
+  labs(x=&quot;Day of year&quot;, y = &quot;Precipitation (mm)&quot;, color=&quot;Station&quot;, shape=&quot;Snow cover&quot;) + 
+  theme(legend.position = &quot;top&quot;)</code></pre>
+<p><img src="images_weather/weather_daily-1.png" width="672" /></p>
+<pre class="r"><code>filter(daily_all_7am) %&gt;% ggplot(aes(x=GTH161, y= US1COGN0018, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
+  labs(color=&quot;Snow cover&quot;, x=stations_source_name[&quot;GTH161&quot;], y=stations_source_name[&quot;US1COGN0018&quot;])</code></pre>
 <p><img src="images_weather/weather_daily-2.png" width="672" /></p>
+<pre class="r"><code>filter(daily_all_7am) %&gt;% ggplot(aes(x=GTH161, y= USC00051959, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
+  labs(color=&quot;Snow cover&quot;, x=stations_source_name[&quot;GTH161&quot;], y=stations_source_name[&quot;USC00051959&quot;])</code></pre>
+<p><img src="images_weather/weather_daily-3.png" width="672" /></p>
+<pre class="r"><code>ggcorr(daily_all_7am %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% 
+          select(-c(date, ground_covered)) %&gt;% rename_with(~ stations_source_name[.x]), 
+       layout.exp=0.5, geom=&quot;tile&quot;, label_size=3, label=T, name=&quot;r&quot;, hjust = .9, size = 2.5)</code></pre>
+<p><img src="images_weather/weather_daily-4.png" width="672" /></p>
 <pre class="r"><code>precip_max &lt;- 50
-lower_continuous &lt;- function (data, mapping, ...) {
-    ggally_smooth(data = data, mapping = mapping, ..., method = &quot;loess&quot;) + scale_shape_manual(values=c(1,2))+
+scatter_continuous &lt;- function (data, mapping, method=&quot;p&quot;, use=&quot;pairwise&quot;, ...) {
+  corr &lt;- cor(eval_data_col(data, mapping$x), eval_data_col(data, mapping$y), method=method, use=use)
+  colFn &lt;- colorRampPalette(c(&quot;blue&quot;, &quot;white&quot;, &quot;red&quot;), interpolate =&#39;spline&#39;)
+  fill &lt;- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
+  ggally_smooth(data = data, mapping = mapping, ..., method = &quot;loess&quot;, color=&quot;blue&quot;, se=F, span=0.3) +
+    ggplot2::annotate(&quot;text&quot;, x=40, y=10, label = round(corr,2))+ 
+        theme_classic() + theme(panel.background = element_rect(fill=fill)) +
+    scale_shape_manual(values=c(1,2))+
     coord_cartesian(xlim=c(0,precip_max), ylim=c(0,precip_max)) + geom_abline(slope=1, intercept=0)+
-    scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))+scale_y_continuous(breaks=seq(0,precip_max, by=precip_max/5))
+    scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))+
+    scale_y_continuous(breaks=seq(0,precip_max, by=precip_max/5))
 }
-lower_combo &lt;- function (data, mapping, ...) {
+facethist_combo &lt;- function (data, mapping, ...) {
     ggally_facethist(data = data, mapping = mapping, binwidth=precip_max/50,...) +
     coord_cartesian(xlim=c(0,precip_max)) + scale_x_continuous(breaks=seq(0,precip_max, by=precip_max/5))
 }
-ggpairs(daily_all %&gt;% select(all_of(unname(stations[-1])), ground_covered), mapping=aes(color=ground_covered,shape=ground_covered), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))</code></pre>
-<p><img src="images_weather/weather_daily-3.png" width="672" /></p>
-<pre class="r"><code>filter(daily_all) %&gt;% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Snow cover&quot;) + 
-   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T)</code></pre>
-<p><img src="images_weather/weather_daily-4.png" width="672" /></p>
-<pre class="r"><code>filter(daily_all_7am) %&gt;% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ground_covered)) + geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Snow cover&quot;) + 
-   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T)</code></pre>
-<p><img src="images_weather/weather_daily-5.png" width="672" /></p>
+corrplot_7am &lt;- ggpairs(daily_all_7am %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% 
+          select(-c(date, ground_covered)) %&gt;% rename_with(~ stations_name[.x]), 
+        lower=list(continuous=wrap(scatter_continuous), na=&quot;blank&quot;), 
+        upper=list(continuous=wrap(scatter_continuous), na=&quot;blank&quot;))
+ggsave(&quot;images_weather/corrplot_7am.pdf&quot;, corrplot_7am, device=cairo_pdf, height=10, width=12)</code></pre>
 </div>
 <div id="monthly-precip-1989-present" class="section level1">
 <h1>Monthly precip 1989-present</h1>
 <pre class="r"><code>#recalculate Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station
-(EPA_89_06_July_avg_mm &lt;- monthly_all %&gt;% filter(mo==7, yr &gt;= 1989, yr &lt;= 2006) %&gt;% pull(EPA_NOAA_filled) %&gt;% mean)</code></pre>
-<pre><code>[1] 53.70822</code></pre>
-<pre class="r"><code>(water_addition_per_month_mm &lt;- (14 / 4 / 2) * 31) #14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July</code></pre>
-<pre><code>[1] 54.25</code></pre>
-<pre class="r"><code>monthly_all %&gt;% pivot_longer(unname(stations), names_to=&quot;station&quot;, values_to=&quot;precipitation_mm&quot;) %&gt;% 
+(EPA_89_06_July_avg_mm &lt;- monthly_filled_7am %&gt;% filter(mo==7, yr &gt;= 1989, yr &lt;= 2006) %&gt;% pull(EPA_NOAA_filled) %&gt;% mean)
+
+(water_addition_per_month_mm &lt;- (14 / 4 / 2) * 31) #14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July
+
+monthly_all %&gt;% pivot_longer(unname(stations), names_to=&quot;station&quot;, values_to=&quot;precipitation_mm&quot;) %&gt;% 
 ggplot(aes(x=mo*30.4-15.2, y=precipitation_mm, color=station)) + facet_wrap(vars(yr)) + #place points at month midpoint
   #geom_rect(data=waterdates %&gt;% pivot_wider(names_from=precip_treatments, values_from=c(day, date)) %&gt;% mutate(yr=factor(year)), 
   #          aes(xmin=day_started, xmax=day_ended, ymin=0, ymax=water_addition_per_month_mm), inherit.aes=F,
@@ -2251,34 +1578,33 @@ ggplot(aes(x=mo*30.4-15.2, y=precipitation_mm, color=station)) + facet_wrap(vars
   geom_point(data=groundcover %&gt;% filter(year&gt;=2004) %&gt;% mutate(yr=factor(year)), aes(x=first_0_cm_day,y=0), inherit.aes=F)+
   geom_point(data=groundcover %&gt;% filter(year&gt;=2005) %&gt;% mutate(yr=factor(year-1)), aes(x=first_snow_day,y=0), inherit.aes=F)+
   labs(y=&quot;Monthly precipitation (mm)&quot;, x=&quot;Day of the year, with snowmelt and first snow dates&quot;, color=&quot;Station&quot;) +
-  theme(legend.position=&quot;top&quot;) + coord_cartesian(ylim=c(0,200))</code></pre>
-<p><img src="images_weather/weather_monthly-1.png" width="672" /></p>
-<pre class="r"><code>precip_max &lt;- 250
-ggpairs(monthly_all %&gt;% mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]) %&gt;% select(all_of(unname(stations[-1])), season), mapping=aes(color=season,shape=season), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))</code></pre>
-<p><img src="images_weather/weather_monthly-2.png" width="672" /></p>
-<pre class="r"><code>filter(monthly_all) %&gt;% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ifelse(mo %in% 6:9,mo,&quot;Oct - May&quot;))) + geom_point() + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Month&quot;)</code></pre>
-<p><img src="images_weather/weather_monthly-3.png" width="672" /></p>
-<pre class="r"><code>monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% 
+  theme(legend.position=&quot;top&quot;) + coord_cartesian(ylim=c(0,200))
+
+precip_max &lt;- 250
+ggpairs(monthly_all %&gt;% mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]) %&gt;% select(all_of(unname(stations[-1])), season), mapping=aes(color=season,shape=season), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))
+
+filter(monthly_all) %&gt;% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ifelse(mo %in% 6:9,mo,&quot;Oct - May&quot;))) + geom_point() + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Month&quot;)
+
+monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% 
   ggplot(aes(x=mo,  y=EPA_NOAA_filled)) + geom_smooth(span=0.5, color=&quot;black&quot;) +
   geom_line(aes(color=ifelse(yr&gt;=2018, &quot;study period (filled)&quot;, ifelse(yr&gt;=2012,&quot;filled from billy&#39;s NOAA data&quot;,&quot;original EPA data&quot;)), group=yr)) +
   geom_point(x=7, y=EPA_89_06_July_avg_mm)+ scale_y_continuous(limits=c(0,100))+
   geom_text(aes(label=ifelse(yr&gt;=2018, yr, &quot;&quot;)))  + 
   labs(y=&quot;Monthly precipitation (mm)&quot;, x=&quot;Month&quot;, title=&quot;EPA/NOAA summer precipitation&quot;, 
-       subtitle=&quot;Black dot is mean July precipitation 1989-2006&quot;, color=&quot;Data filling&quot;) + theme(legend.position = &quot;top&quot;)</code></pre>
-<p><img src="images_weather/weather_monthly-4.png" width="672" /></p>
-<pre class="r"><code>monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% ggplot(aes(x=yr, color=factor(mo), group=mo, shape=ifelse(yr&gt;=2018, &quot;study period (filled)&quot;, ifelse(yr&gt;=2012,&quot;filled from billy&#39;s NOAA data&quot;,&quot;original EPA data&quot;)), y=EPA_NOAA_filled)) +
+       subtitle=&quot;Black dot is mean July precipitation 1989-2006&quot;, color=&quot;Data filling&quot;) + theme(legend.position = &quot;top&quot;)
+
+monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% ggplot(aes(x=yr, color=factor(mo), group=mo, shape=ifelse(yr&gt;=2018, &quot;study period (filled)&quot;, ifelse(yr&gt;=2012,&quot;filled from billy&#39;s NOAA data&quot;,&quot;original EPA data&quot;)), y=EPA_NOAA_filled)) +
   geom_vline(xintercept=2011.5) +geom_point() + geom_smooth(se=F, span=0.7) + 
   scale_shape_manual(values=c(1,2,19)) + scale_y_continuous(limits=c(0,100))+
   labs(x=&quot;Year&quot;,y=&quot;EPA Research Meadow monthly precipitation (mm)&quot;, color=&quot;Month&quot;, shape=&quot;Data filling&quot;) + 
   geom_segment(data=monthly_all %&gt;% filter(mo %in% 5:9, yr &lt;= 2007) %&gt;% 
                  group_by(mo) %&gt;% summarize(mean_precip=mean(EPA_NOAA_filled)), 
                aes(x=1989, xend=2006, y=mean_precip, yend=mean_precip, color=factor(mo)), inherit.aes=F, size=1) </code></pre>
-<p><img src="images_weather/weather_monthly-5.png" width="672" /></p>
 </div>
 <div id="summer-precip-trends-1989-present" class="section level1">
 <h1>Summer precip trends 1989-present</h1>
-<p>Combined EPA Research Meadow / NOAA billy dataset from summers 1990-2020</p>
-<pre class="r"><code>daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021) %&gt;%
+<p>Combined EPA Research Meadow / NOAA dataset from summers 1990-2020</p>
+<pre class="r"><code>daily_filled_7am %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021) %&gt;%
   mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, &quot;2020&quot;=&quot;2010&quot;)) %&gt;%
   group_by(julian, decade) %&gt;% 
   summarize(EPA_NOAA_filled = mean(EPA_NOAA_filled, na.rm=T), ground_covered=mean(as.integer(ground_covered), na.rm=T)-1) %&gt;% 
@@ -2287,17 +1613,17 @@ ggpairs(monthly_all %&gt;% mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&qu
   labs(x=&quot;Day of year&quot;, y=&quot;Mean EPA/NOAA precipiation (mm)&quot;, color=&quot;Decade&quot;, title=&quot;Snowmelt and monsoon timing by decade&quot;) +
     scale_color_brewer(palette = &quot;Set1&quot;, direction = -1) + theme_minimal()</code></pre>
 <p><img src="images_weather/precip_trend-1.png" width="672" /></p>
-<pre class="r"><code>daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, ground_covered==&quot;smmr&quot;, EPA_NOAA_filled &gt; 0) %&gt;%   
+<pre class="r"><code>daily_filled_7am %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, ground_covered==&quot;smmr&quot;, EPA_NOAA_filled &gt; 0) %&gt;%   
   mutate(decade = factor(floor(year(date)/10)*10), decade = recode(decade, &quot;2020&quot;=&quot;2010&quot;)) %&gt;% group_by(decade) %&gt;% 
   ggplot(aes(x=EPA_NOAA_filled, color=decade)) + geom_density() +
     labs(x=&quot;EPA/NOAA precipiation (mm)&quot;, y=&quot;Proportion&quot;, color=&quot;Decade&quot;, title=&quot;Intensity spectrum of summer rainstorms &gt; 0 mm&quot;) +
       scale_color_brewer(palette = &quot;Set1&quot;, direction = -1) + 
   scale_x_continuous(breaks=scales::breaks_extended(10)) + theme_minimal()</code></pre>
 <p><img src="images_weather/precip_trend-2.png" width="672" /></p>
-<pre class="r"><code>summary_EPA_NOAA &lt;- daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, EPA_NOAA_filled &gt; 2) %&gt;% 
+<pre class="r"><code>summary_EPA_NOAA &lt;- daily_filled_7am %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, EPA_NOAA_filled &gt; 2) %&gt;% 
   mutate(drought_days = c(0,diff(date)), year=year(date)) %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% 
   select(year, date, drought_days) %&gt;% group_by(year) %&gt;% summarize(max_drought_days_2mm = max(drought_days)) %&gt;% 
-  left_join(daily_all %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, ground_covered==&quot;smmr&quot;) %&gt;% group_by(year=year(date)) %&gt;% 
+  left_join(daily_filled_7am  %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, ground_covered==&quot;smmr&quot;) %&gt;% group_by(year=year(date)) %&gt;% 
               summarize(rain_days_2mm = sum(EPA_NOAA_filled &gt; 2, na.rm=T),
                         max_precip_mm = max(EPA_NOAA_filled, na.rm=T),
                         total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
