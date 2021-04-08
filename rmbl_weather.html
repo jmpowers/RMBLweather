@@ -1660,12 +1660,11 @@ ggplot(daily_filled_7am %&gt;% mutate(year=year(date)) %&gt;% filter(year&gt;=19
 </div>
 <div id="monthly-precip-1989-present" class="section level1">
 <h1>Monthly precip 1989-present</h1>
-<pre class="r"><code>#recalculate Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station
-(EPA_89_06_July_avg_mm &lt;- monthly_filled_7am %&gt;% filter(mo==7, yr &gt;= 1989, yr &lt;= 2006) %&gt;% pull(EPA_NOAA_filled) %&gt;% mean)
-
-(water_addition_per_month_mm &lt;- (14 / 4 / 2) * 31) #14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July
-
-monthly_filled_7am %&gt;% filter(yr&gt;=2004) %&gt;% 
+<ul>
+<li>Recalculated Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station : 55.8517009 mm</li>
+<li>Maxfield water additions per month: 14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July = 54.25 mm.</li>
+</ul>
+<pre class="r"><code>monthly_filled_7am %&gt;% filter(yr&gt;=2004) %&gt;% 
   pivot_longer(-c(yr,mo), names_to=&quot;id&quot;, values_to=&quot;prcp_mm&quot;) %&gt;% 
   ggplot(aes(x=mo*30.4-15.2, y=prcp_mm, color=stations_name[id])) + facet_wrap(vars(yr)) + #place points at month midpoint
   #geom_rect(data=waterdates %&gt;% pivot_wider(names_from=precip_treatments, values_from=c(day, date)) %&gt;% mutate(yr=factor(year)), 
@@ -1675,28 +1674,33 @@ monthly_filled_7am %&gt;% filter(yr&gt;=2004) %&gt;%
     geom_line(data=daily_all_7am  %&gt;% mutate(yr=year(date)) %&gt;% filter(yr&gt;=2004),
               aes(x=yday(date), y=20-20*as.integer(ground_covered)), color=&quot;black&quot;) + 
   labs(y=&quot;Monthly precipitation (mm)&quot;, x=&quot;Day of the year, with snowmelt and first snow dates&quot;, color=&quot;Station&quot;) +
-  theme(legend.position=&quot;top&quot;) + coord_cartesian(ylim=c(0,200)) + scale_color_manual(values=stations_pal)
+  theme(legend.position=&quot;top&quot;) + coord_cartesian(ylim=c(0,200)) + scale_color_manual(values=stations_pal)</code></pre>
+<p><img src="images_weather/weather_monthly-1.png" width="672" /></p>
+<pre class="r"><code>precip_max &lt;- 250
+corrplot_monthly_7am &lt;- ggpairs(monthly_all_7am %&gt;% filter(mo %in% 6:9) %&gt;% 
+          select(-c(yr, mo)) %&gt;% rename_with(~ stations_name[.x]), 
+        lower=list(continuous=wrap(scatter_continuous), na=&quot;blank&quot;), 
+        upper=list(continuous=wrap(scatter_continuous), na=&quot;blank&quot;))
+ggsave(&quot;images_weather/corrplot_monthly_7am.pdf&quot;, corrplot_monthly_7am, device=cairo_pdf, height=10, width=12)
 
-precip_max &lt;- 250
-ggpairs(monthly_all %&gt;% mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]) %&gt;% select(all_of(unname(stations[-1])), season), mapping=aes(color=season,shape=season), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))
-
-filter(monthly_all) %&gt;% ggplot(aes(y=EPA_RsrchMdw,x= NOAA_billy, color=ifelse(mo %in% 6:9,mo,&quot;Oct - May&quot;))) + geom_point() + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Month&quot;)
-
-monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% 
+ggplot(monthly_all_7am, aes(y=GTH161,x= USC00051959, color=ifelse(mo %in% 6:9,mo,&quot;Oct - May&quot;))) + geom_point() + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + labs(color=&quot;Month&quot;)</code></pre>
+<p><img src="images_weather/weather_monthly-2.png" width="672" /></p>
+<pre class="r"><code>monthly_filled_7am %&gt;% filter(yr &gt;= 1989, mo %in% 5:9) %&gt;% 
   ggplot(aes(x=mo,  y=EPA_NOAA_filled)) + geom_smooth(span=0.5, color=&quot;black&quot;) +
-  geom_line(aes(color=ifelse(yr&gt;=2018, &quot;study period (filled)&quot;, ifelse(yr&gt;=2012,&quot;filled from billy&#39;s NOAA data&quot;,&quot;original EPA data&quot;)), group=yr)) +
+  geom_line(aes(color=ifelse(yr&gt;=2018, &quot;study period (est from CB)&quot;, ifelse(yr&gt;=2012,&quot;est from CB&quot;,&quot;gap-filled EPA data&quot;)), group=yr)) +
   geom_point(x=7, y=EPA_89_06_July_avg_mm)+ scale_y_continuous(limits=c(0,100))+
   geom_text(aes(label=ifelse(yr&gt;=2018, yr, &quot;&quot;)))  + 
   labs(y=&quot;Monthly precipitation (mm)&quot;, x=&quot;Month&quot;, title=&quot;EPA/NOAA summer precipitation&quot;, 
-       subtitle=&quot;Black dot is mean July precipitation 1989-2006&quot;, color=&quot;Data filling&quot;) + theme(legend.position = &quot;top&quot;)
-
-monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% ggplot(aes(x=yr, color=factor(mo), group=mo, shape=ifelse(yr&gt;=2018, &quot;study period (filled)&quot;, ifelse(yr&gt;=2012,&quot;filled from billy&#39;s NOAA data&quot;,&quot;original EPA data&quot;)), y=EPA_NOAA_filled)) +
+       subtitle=&quot;Black dot is mean July precipitation 1989-2006&quot;, color=&quot;Data filling&quot;) + theme(legend.position = &quot;top&quot;)</code></pre>
+<p><img src="images_weather/weather_monthly-3.png" width="672" /></p>
+<pre class="r"><code>monthly_filled_7am %&gt;% filter(yr &gt;= 1989, mo %in% 5:9) %&gt;% ggplot(aes(x=yr, color=factor(mo), group=mo, shape=ifelse(yr&gt;=2018, &quot;study period (est from CB)&quot;, ifelse(yr&gt;=2012,&quot;est from CB&quot;,&quot;gap-filled EPA data&quot;)), y=EPA_NOAA_filled)) +
   geom_vline(xintercept=2011.5) +geom_point() + geom_smooth(se=F, span=0.7) + 
   scale_shape_manual(values=c(1,2,19)) + scale_y_continuous(limits=c(0,100))+
   labs(x=&quot;Year&quot;,y=&quot;EPA Research Meadow monthly precipitation (mm)&quot;, color=&quot;Month&quot;, shape=&quot;Data filling&quot;) + 
-  geom_segment(data=monthly_all %&gt;% filter(mo %in% 5:9, yr &lt;= 2007) %&gt;% 
+  geom_segment(data=monthly_filled_7am %&gt;% filter(mo %in% 5:9, yr &lt;= 2007, yr &gt;= 1989,) %&gt;% 
                  group_by(mo) %&gt;% summarize(mean_precip=mean(EPA_NOAA_filled)), 
                aes(x=1989, xend=2006, y=mean_precip, yend=mean_precip, color=factor(mo)), inherit.aes=F, size=1) </code></pre>
+<p><img src="images_weather/weather_monthly-4.png" width="672" /></p>
 </div>
 <div id="summer-precip-trends-1989-present" class="section level1">
 <h1>Summer precip trends 1989-present</h1>
@@ -1732,7 +1736,8 @@ summary_names &lt;- c(max_drought_days_2mm=&quot;Longest drought (&lt; 2 mm prec
 
 ggplot(summary_EPA_NOAA %&gt;% pivot_longer(!year), aes(y=value, x=year))+ 
   facet_wrap(vars(name), scales=&quot;free_y&quot;, labeller=as_labeller(summary_names)) +
-  geom_smooth(method=&quot;lm&quot;, color=&quot;black&quot;, se=F) + geom_point() + labs(x=&quot;Year&quot;, y=&quot;&quot;) + 
+  geom_smooth(method=&quot;lm&quot;, color=&quot;black&quot;, se=F) + geom_point(color=&quot;grey40&quot;) + labs(x=&quot;Year&quot;, y=&quot;&quot;) + 
+  stat_poly_eq(formula = y ~ x, aes(label = paste(..rr.label.., ..p.value.label.., sep = &quot;~~~&quot;)), parse = T) +
   theme_bw() +theme(text=element_text(color=&quot;black&quot;, size=14), axis.text = element_text(color=&quot;black&quot;),
                             axis.title.y= element_blank(), strip.background = element_blank())</code></pre>
 <p><img src="images_weather/precip_trend-3.png" width="672" /></p>
