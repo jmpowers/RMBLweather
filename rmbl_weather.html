@@ -11,7 +11,7 @@
 
 <meta name="author" content="John Powers" />
 
-<meta name="date" content="2021-04-07" />
+<meta name="date" content="2021-04-08" />
 
 <title>RMBL Weather Data</title>
 
@@ -257,7 +257,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">RMBL Weather Data</h1>
 <h4 class="author"><a href="http://sites.uci.edu/powers/">John Powers</a></h4>
-<h4 class="date">2021-04-07</h4>
+<h4 class="date">2021-04-08</h4>
 
 </div>
 
@@ -857,35 +857,6 @@ daily_long_7am &lt;- bind_rows(
 
 daily_all_7am &lt;- daily_long_7am %&gt;% 
   pivot_wider(names_from=&quot;id&quot;, values_from=&quot;prcp_mm&quot;) %&gt;% arrange(date)</code></pre>
-<div id="fill-in-epa-castnet-data" class="section level3">
-<h3>Fill in EPA CASTNET data</h3>
-<p>EPA precip data from the Research Meadow ends in 2011, so fill in with from billy’s NOAA/CoCoRaHs station in Gothic. * Sum the EPA precipitation data (GTH161) from 7 am to 7 am to match CoCoRaHs period, and count hours before 7am as the previous day * Uses a simple linear model for their period of overlap, forced through zero * Fit separately for summer vs. winter (determined by billy’s groundcover data) * billy’s data fills gaps from 2012-present, and small gaps from 2004-2011 (US1COGN0018, summer r = 0.90) * Before that (1989-2004), small gaps are filled with a similar regression to the NOAA Crested Butte station (USC00051959, summer r = 0.75)</p>
-<pre class="r"><code>EPA_billy_daily_model &lt;-  lm(GTH161 ~ US1COGN0018:ground_covered+0, data=daily_all_7am)
-EPA_CB_daily_model &lt;-     lm(GTH161 ~ USC00051959:ground_covered+0, data=daily_all_7am)
-
-daily_filled_7am &lt;- daily_all_7am %&gt;% 
-  mutate(EPA_NOAA_source = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), &quot;NOAA_billy&quot;, 
-                                                               ifelse(!is.na(USC00051959), &quot;NOAA_CB&quot;, NA)), &quot;EPA&quot;) %&gt;% factor,
-         EPA_NOAA_filled = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), predict(EPA_billy_daily_model),
-                                                        ifelse(!is.na(USC00051959), predict(EPA_CB_daily_model), NA)), GTH161))
-save(daily_filled_7am, file=&quot;data/daily_all.rda&quot;)
-
-monthly_filled_7am &lt;- daily_filled_7am %&gt;% group_by(yr = year(date), mo = month(date)) %&gt;% 
-  summarize(across(-c(date, ground_covered, EPA_NOAA_source), ~ ifelse(sum(is.na(.x))&gt;5, NA, sum(.x, na.rm=T))), .groups=&quot;drop&quot;) %&gt;%
-  arrange(yr, mo)
-#EPA_NOAA_monthly_model &lt;-lm(EPA_RsrchMdw ~ NOAA_billy*season, data=monthly_all %&gt;% 
-#mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]))
-
-ggplot(daily_filled_7am %&gt;% mutate(year=year(date)) %&gt;% filter(year&gt;=1989), aes(x=yday(date))) + 
-  facet_wrap(vars(year)) + 
-  geom_line(aes(y=40-10*as.integer(ground_covered))) + 
-  geom_point(aes(y=EPA_NOAA_filled, color=EPA_NOAA_source), size=0.5) + 
-  guides(color=guide_legend(override.aes = list(size=3)))+
-  labs(x=&quot;Day of year&quot;, y=&quot;EPA/NOAA precipiation (mm)&quot;, color=&quot;Filled from&quot;) + 
-  theme_minimal() + theme(legend.position=&quot;top&quot;, panel.spacing = unit(0,&quot;pt&quot;), 
-                          panel.grid.minor=element_blank(), panel.grid.major.x=element_blank())</code></pre>
-<p><img src="images_weather/EPA_NOAA_fill-1.png" width="672" /></p>
-</div>
 </div>
 </div>
 <div id="stations" class="section level1">
@@ -905,7 +876,7 @@ ggplot(daily_filled_7am %&gt;% mutate(year=year(date)) %&gt;% filter(year&gt;=19
     mutate(element=&quot;PRCP&quot;)) %&gt;% 
   mutate(source_name = paste(source, name, sep=&quot;_&quot;), 
          short_name = str_replace(name, &quot;CRESTED BUTTE&quot;,&quot;CB&quot;),
-         color = c(brewer.pal(9, &quot;Set1&quot;), brewer.pal(6, &quot;Dark2&quot;))) %&gt;% 
+         color = c(brewer.pal(8, &quot;Set1&quot;), &quot;black&quot;, brewer.pal(9, &quot;Set1&quot;)[9], brewer.pal(6, &quot;Dark2&quot;))) %&gt;% 
   rows_patch(daily_long %&gt;% drop_na(prcp_mm)  %&gt;% group_by(id) %&gt;% summarize(first_year=min(year(date)), last_year=max(year(date))))
 stations_pal &lt;- with(all_stations, set_names(color, short_name))
 stations_name &lt;- with(all_stations, set_names(short_name, id))
@@ -1236,6 +1207,41 @@ NA
 </tr>
 <tr>
 <td style="text-align:left;">
+EPA_NOAA
+</td>
+<td style="text-align:left;">
+<a href="https://www3.epa.gov/castnet/site_pages/GTH161.html" style="     ">EPA_NOAA_filled</a>
+</td>
+<td style="text-align:left;">
+RsrchMdw_filled
+</td>
+<td style="text-align:right;">
+38.95627
+</td>
+<td style="text-align:right;">
+-106.9859
+</td>
+<td style="text-align:right;">
+0.8651189
+</td>
+<td style="text-align:right;">
+2915.0
+</td>
+<td style="text-align:left;">
+PRCP
+</td>
+<td style="text-align:right;">
+NA
+</td>
+<td style="text-align:right;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
 WRCC
 </td>
 <td style="text-align:left;">
@@ -1263,7 +1269,7 @@ PRCP
 2015
 </td>
 <td style="text-align:right;">
-2021
+2020
 </td>
 <td style="text-align:left;">
 NA
@@ -1489,7 +1495,7 @@ NA
 map &lt;- openmap(c(39.05, -107.1), c(38.85, -106.9), type = &quot;stamen-terrain&quot;)
 map.latlon &lt;- openproj(map, projection = &quot;+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs&quot;)
 autoplot(map.latlon) + 
-  geom_point(data=filter(all_stations, id != &quot;CORALM&quot;), 
+  geom_point(data=filter(all_stations, !(id %in% c(&quot;CORALM&quot;, &quot;EPA_NOAA_filled&quot;))), 
              aes(x=longitude, y=latitude, color=short_name), size=2) + 
   theme(legend.position=&quot;bottom&quot;, axis.title=element_blank()) + labs(color=&quot;Station&quot;) +
   scale_color_manual(values=stations_pal)</code></pre>
@@ -1525,20 +1531,10 @@ autoplot(map.latlon) +
   labs(x=&quot;Day of year&quot;, y = &quot;Precipitation (mm)&quot;, color=&quot;Station&quot;, shape=&quot;Snow cover&quot;) + 
   theme(legend.position = &quot;top&quot;)</code></pre>
 <p><img src="images_weather/weather_daily-1.png" width="672" /></p>
-<pre class="r"><code>filter(daily_all_7am) %&gt;% ggplot(aes(x=GTH161, y= US1COGN0018, color=ground_covered)) + coord_fixed()+
-  geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + 
-   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
-  labs(color=&quot;Snow cover&quot;, x=stations_source_name[&quot;GTH161&quot;], y=stations_source_name[&quot;US1COGN0018&quot;])</code></pre>
-<p><img src="images_weather/weather_daily-2.png" width="672" /></p>
-<pre class="r"><code>filter(daily_all_7am) %&gt;% ggplot(aes(x=GTH161, y= USC00051959, color=ground_covered)) + coord_fixed()+
-  geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + 
-   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
-  labs(color=&quot;Snow cover&quot;, x=stations_source_name[&quot;GTH161&quot;], y=stations_source_name[&quot;USC00051959&quot;])</code></pre>
-<p><img src="images_weather/weather_daily-3.png" width="672" /></p>
 <pre class="r"><code>ggcorr(daily_all_7am %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% 
           select(-c(date, ground_covered)) %&gt;% rename_with(~ stations_source_name[.x]), 
        layout.exp=0.5, geom=&quot;tile&quot;, label_size=3, label=T, name=&quot;r&quot;, hjust = .9, size = 2.5)</code></pre>
-<p><img src="images_weather/weather_daily-4.png" width="672" /></p>
+<p><img src="images_weather/weather_daily-2.png" width="672" /></p>
 <pre class="r"><code>precip_max &lt;- 50
 scatter_continuous &lt;- function (data, mapping, method=&quot;p&quot;, use=&quot;pairwise&quot;, ...) {
   corr &lt;- cor(eval_data_col(data, mapping$x), eval_data_col(data, mapping$y), method=method, use=use)
@@ -1562,6 +1558,106 @@ corrplot_7am &lt;- ggpairs(daily_all_7am %&gt;% filter(ground_covered==&quot;smm
         upper=list(continuous=wrap(scatter_continuous), na=&quot;blank&quot;))
 ggsave(&quot;images_weather/corrplot_7am.pdf&quot;, corrplot_7am, device=cairo_pdf, height=10, width=12)</code></pre>
 </div>
+<div id="fill-in-research-meadow-precip-data" class="section level1">
+<h1>Fill in Research Meadow precip data</h1>
+<p>EPA precip data from the Research Meadow ends in 2011 and has some small gaps that need to be filled in to get accurate summer totals.</p>
+<ul>
+<li>For both of these methods, the EPA precipitation data (GTH161) is summed from 7 am to 7 am to match the collections at CoCoRaHs stations and NOAA Crested Butte (actually 9 am), and count hours before 7am as the previous day</li>
+</ul>
+<div id="regression-method---not-used" class="section level2">
+<h2>Regression method - not used</h2>
+<ul>
+<li>Uses a simple linear model for their period of overlap, forced through zero</li>
+<li>Fit separately for summer vs. winter (determined by billy’s groundcover data)</li>
+<li>billy’s Gothic CoCoRaHs data fills gaps from 2012-present, and small gaps from 2004-2011 (US1COGN0018, summer r = 0.90)</li>
+<li>Before that (1989-2004), small gaps are filled with a similar regression to the NOAA Crested Butte station (USC00051959, summer r = 0.75)</li>
+<li>Regressions are not a great method since they are influenced strongly by large precip events</li>
+<li>Give different slopes when run on daily or monthly scales</li>
+<li>Use the Normal Ratio Method instead (see below)</li>
+</ul>
+<pre class="r"><code># EPA_billy_daily_model &lt;-  lm(GTH161 ~ US1COGN0018:ground_covered + 0, data=daily_all_7am)
+# EPA_CB_daily_model &lt;-     lm(GTH161 ~ USC00051959:ground_covered + 0, data=daily_all_7am)
+# 
+# daily_filled_7am &lt;- daily_all_7am %&gt;% 
+#   mutate(EPA_NOAA_source = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), &quot;US1COGN0018&quot;, 
+#                                                                ifelse(!is.na(USC00051959), &quot;USC00051959&quot;, NA)), &quot;GTH161&quot;),
+#          EPA_NOAA_filled = ifelse(is.na(GTH161), ifelse(!is.na(US1COGN0018), predict(EPA_billy_daily_model),
+#                                                         ifelse(!is.na(USC00051959), predict(EPA_CB_daily_model), NA)), GTH161))
+
+monthly_all_7am &lt;- daily_all_7am %&gt;% group_by(yr = year(date), mo = month(date)) %&gt;% 
+  summarize(across(-c(date, ground_covered), 
+                   ~ ifelse(sum(is.na(.x))&gt;5, NA, sum(.x, na.rm=T))), .groups=&quot;drop&quot;) %&gt;%  #tolerate 5 missing days
+  arrange(yr, mo)
+
+library(gridExtra)
+grid.arrange(
+  ggplot(daily_all_7am, aes(y=GTH161, x= US1COGN0018, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(span=0.3, se=F) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
+  labs(color=&quot;Snow cover&quot;, y=stations_source_name[&quot;GTH161&quot;], x=stations_source_name[&quot;US1COGN0018&quot;], title=&quot;Daily totals&quot;),
+ggplot(monthly_all_7am %&gt;%  mutate(season=factor(c(&quot;Oct-May&quot;,&quot;Jun-Sept&quot;))[1+mo %in% 6:9]),
+       aes(y=GTH161, x= US1COGN0018, color=season)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(span=0.6, se=F) + geom_smooth(method=&quot;lm&quot;, formula= y ~ x + 0, se=F) + geom_abline(intercept=0, slope=1) +
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
+  labs(color=&quot;Season&quot;, y=stations_source_name[&quot;GTH161&quot;], x=stations_source_name[&quot;US1COGN0018&quot;], title=&quot;Monthly totals&quot;))</code></pre>
+<p><img src="images_weather/EPA_NOAA_fill-1.png" width="672" /></p>
+<pre class="r"><code>grid.arrange(
+ggplot(daily_all_7am, aes(y=GTH161, x= USC00051959, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
+  labs(color=&quot;Snow cover&quot;, y=stations_source_name[&quot;GTH161&quot;], x=stations_source_name[&quot;USC00051959&quot;], title=&quot;Daily totals&quot;),
+ggplot(monthly_all_7am %&gt;%  mutate(season=factor(c(&quot;Oct-May&quot;,&quot;Jun-Sept&quot;))[1+mo %in% 6:9]),
+       aes(y=GTH161, x= USC00051959, color=season)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(span=0.6, se=F) + geom_smooth(method=&quot;lm&quot;, formula= y ~ x + 0, se=F) + geom_abline(intercept=0, slope=1) +
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
+  labs(color=&quot;Season&quot;, y=stations_source_name[&quot;GTH161&quot;], x=stations_source_name[&quot;USC00051959&quot;], title=&quot;Monthly totals&quot;))</code></pre>
+<p><img src="images_weather/EPA_NOAA_fill-2.png" width="672" /></p>
+</div>
+<div id="normal-ratio-method" class="section level2">
+<h2>Normal ratio method</h2>
+<p>This method uses the ratio between the average annual precipitation at each station to fill in missing values.</p>
+<ul>
+<li>I adapted it to use the average of the ratios across years (since only some years overlap and the average is changing with cliamte change)</li>
+<li>I only consider summer precipitation, since winter precip is less easily measured and the ratios differ</li>
+<li>The plot compares the ratios of total summer/winter precip (determined by billy’s groundcover data) to the NOAA Crested Butte station (CB)</li>
+<li>The EPA vs. CB summer ratio is usually close to 1 and not that variable, so all of the missing data are filled from CB.</li>
+<li><a href="https://www.aboutcivil.org/analysis-of-precipitation-data.html">Guide to some precipitation imputation methods</a></li>
+<li>In a paper comparing precipitation imputation methods, known as the <a href="https://iwaponline.com/hr/article/48/4/1032/1542/Assessment-of-different-methods-for-estimation-of">“UK traditional method”</a></li>
+</ul>
+<pre class="r"><code># total summer or winter precip relative to CB station
+# calculated as daily average for each station across the season, dropping missing values
+relative_to_CB &lt;- daily_all_7am %&gt;% drop_na(ground_covered) %&gt;% 
+  group_by(year=year(date), ground_covered) %&gt;% summarize(across(-c(date), ~mean(.x, na.rm=T)/mean(USC00051959, na.rm=T)))
+
+relative_to_CB %&gt;% pivot_longer(-c(year, ground_covered), names_to=&quot;id&quot;, values_to=&quot;prcp_rel_CB&quot;) %&gt;% 
+  ggplot(aes(y=stations_source_name[id], x=prcp_rel_CB, color=ground_covered))+ 
+  geom_vline(xintercept=1) + geom_boxplot() + scale_x_continuous(breaks=0:6)+
+  labs(x=&quot;Mean daily precipitation relative to Crested Butte&quot;, y=&quot;&quot;, color=&quot;Snow cover&quot;) + theme(legend.position = &quot;top&quot;)</code></pre>
+<p><img src="images_weather/EPA_CB_fill-1.png" width="672" /></p>
+<pre class="r"><code>EPA_CB_summer_factor &lt;- relative_to_CB %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% drop_na(GTH161) %&gt;% pull(GTH161) %&gt;% mean
+
+daily_filled_7am &lt;- daily_all_7am %&gt;% 
+  mutate(EPA_NOAA_source = ifelse(is.na(GTH161), ifelse(!is.na(USC00051959), &quot;USC00051959&quot;, &quot;missing&quot;), &quot;GTH161&quot;),
+         EPA_NOAA_filled = ifelse(is.na(GTH161), ifelse(!is.na(USC00051959), USC00051959*EPA_CB_summer_factor, NA), GTH161))
+save(daily_filled_7am, file=&quot;data/daily_all.rda&quot;)
+
+monthly_filled_7am &lt;- daily_filled_7am %&gt;% group_by(yr = year(date), mo = month(date)) %&gt;% 
+  summarize(across(-c(date, ground_covered, EPA_NOAA_source), 
+                   ~ ifelse(sum(is.na(.x))&gt;5, NA, sum(.x, na.rm=T))), .groups=&quot;drop&quot;) %&gt;%  #tolerate 5 missing days
+  arrange(yr, mo)
+
+ggplot(daily_filled_7am %&gt;% mutate(year=year(date)) %&gt;% filter(year&gt;=1989), aes(x=yday(date))) + 
+  facet_wrap(vars(year)) + 
+  geom_line(aes(y=40-10*as.integer(ground_covered))) + 
+  geom_point(aes(y=EPA_NOAA_filled, color=stations_name[EPA_NOAA_source]), size=0.5) + 
+  scale_color_manual(values=stations_pal)+
+  guides(color=guide_legend(override.aes = list(size=3)))+
+  labs(x=&quot;Day of year&quot;, y=&quot;EPA/NOAA precipiation (mm)&quot;, color=&quot;Filled from&quot;) + 
+  theme_minimal() + theme(legend.position=&quot;top&quot;, panel.spacing = unit(0,&quot;pt&quot;), 
+                          panel.grid.minor=element_blank(), panel.grid.major.x=element_blank())</code></pre>
+<p><img src="images_weather/EPA_CB_fill-2.png" width="672" /></p>
+</div>
+</div>
 <div id="monthly-precip-1989-present" class="section level1">
 <h1>Monthly precip 1989-present</h1>
 <pre class="r"><code>#recalculate Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station
@@ -1569,16 +1665,17 @@ ggsave(&quot;images_weather/corrplot_7am.pdf&quot;, corrplot_7am, device=cairo_p
 
 (water_addition_per_month_mm &lt;- (14 / 4 / 2) * 31) #14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July
 
-monthly_all %&gt;% pivot_longer(unname(stations), names_to=&quot;station&quot;, values_to=&quot;precipitation_mm&quot;) %&gt;% 
-ggplot(aes(x=mo*30.4-15.2, y=precipitation_mm, color=station)) + facet_wrap(vars(yr)) + #place points at month midpoint
+monthly_filled_7am %&gt;% filter(yr&gt;=2004) %&gt;% 
+  pivot_longer(-c(yr,mo), names_to=&quot;id&quot;, values_to=&quot;prcp_mm&quot;) %&gt;% 
+  ggplot(aes(x=mo*30.4-15.2, y=prcp_mm, color=stations_name[id])) + facet_wrap(vars(yr)) + #place points at month midpoint
   #geom_rect(data=waterdates %&gt;% pivot_wider(names_from=precip_treatments, values_from=c(day, date)) %&gt;% mutate(yr=factor(year)), 
   #          aes(xmin=day_started, xmax=day_ended, ymin=0, ymax=water_addition_per_month_mm), inherit.aes=F,
   #          fill=water_pal[&quot;Addition&quot;])+
-  geom_line() +  geom_point()+
-  geom_point(data=groundcover %&gt;% filter(year&gt;=2004) %&gt;% mutate(yr=factor(year)), aes(x=first_0_cm_day,y=0), inherit.aes=F)+
-  geom_point(data=groundcover %&gt;% filter(year&gt;=2005) %&gt;% mutate(yr=factor(year-1)), aes(x=first_snow_day,y=0), inherit.aes=F)+
+  geom_line() +  geom_point()+ 
+    geom_line(data=daily_all_7am  %&gt;% mutate(yr=year(date)) %&gt;% filter(yr&gt;=2004),
+              aes(x=yday(date), y=20-20*as.integer(ground_covered)), color=&quot;black&quot;) + 
   labs(y=&quot;Monthly precipitation (mm)&quot;, x=&quot;Day of the year, with snowmelt and first snow dates&quot;, color=&quot;Station&quot;) +
-  theme(legend.position=&quot;top&quot;) + coord_cartesian(ylim=c(0,200))
+  theme(legend.position=&quot;top&quot;) + coord_cartesian(ylim=c(0,200)) + scale_color_manual(values=stations_pal)
 
 precip_max &lt;- 250
 ggpairs(monthly_all %&gt;% mutate(season=factor(c(&quot;wntr&quot;,&quot;smmr&quot;))[1+mo %in% 6:9]) %&gt;% select(all_of(unname(stations[-1])), season), mapping=aes(color=season,shape=season), lower=list(continuous=wrap(lower_continuous), combo=wrap(lower_combo)))
@@ -1603,7 +1700,7 @@ monthly_all %&gt;% filter(mo %in% 5:9) %&gt;% ggplot(aes(x=yr, color=factor(mo),
 </div>
 <div id="summer-precip-trends-1989-present" class="section level1">
 <h1>Summer precip trends 1989-present</h1>
-<p>Combined EPA Research Meadow / NOAA dataset from summers 1990-2020</p>
+<p>Combined EPA Research Meadow / NOAA Crested Butte dataset from summers 1990-2020</p>
 <pre class="r"><code>daily_filled_7am %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021) %&gt;%
   mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, &quot;2020&quot;=&quot;2010&quot;)) %&gt;%
   group_by(julian, decade) %&gt;% 

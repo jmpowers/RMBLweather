@@ -7,3 +7,4 @@ WRCC	CORKET	KettlePonds	38.942	-106.973	2860	CO	https://wrcc.dri.edu/cgi-bin/raw
 WRCC	CORMEX	MexicanCut	39.028	-107.064	3412	CO	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?cormex
 WRCC	CORSNO	Snodgrass	38.933	-106.986	3396	CO	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?corsno
 WRCC	CORALM	Almont	38.655	-106.862	2469	CO	https://wrcc.dri.edu/cgi-bin/rawMAIN.pl?coralm
+EPA_NOAA	EPA_NOAA_filled	RsrchMdw_filled	38.95627	-106.98587	2915	CO	https://www3.epa.gov/castnet/site_pages/GTH161.html
