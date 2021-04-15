@@ -11,7 +11,7 @@
 
 <meta name="author" content="John Powers" />
 
-<meta name="date" content="2021-04-08" />
+<meta name="date" content="2021-04-14" />
 
 <title>RMBL Weather Data</title>
 
@@ -257,7 +257,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">RMBL Weather Data</h1>
 <h4 class="author"><a href="http://sites.uci.edu/powers/">John Powers</a></h4>
-<h4 class="date">2021-04-08</h4>
+<h4 class="date">2021-04-14</h4>
 
 </div>
 
@@ -423,7 +423,8 @@ daily_NOAA &lt;- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %&gt;%
   mutate(across(contains(&quot;flag&quot;), as.factor)) %&gt;% #All units are in tenths of mm, converted to mm here.
   mutate(across(c(&quot;prcp&quot;,&quot;snow&quot;,&quot;snwd&quot;,&quot;wesd&quot;,&quot;wesf&quot;), ~ as.integer(.x)/10, .names=&quot;{.col}_mm&quot;), .keep=&quot;unused&quot;) %&gt;% 
   mutate(across(c(&quot;tmin&quot;,&quot;tavg&quot;,&quot;tmax&quot;), ~ as.integer(.x)/10, .names=&quot;{.col}_C&quot;), .keep=&quot;unused&quot;) %&gt;% 
-  mutate(date = case_when(id %in% NOAA_stations_morning ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am, so set them back a day</code></pre>
+  mutate(date = case_when(id %in% NOAA_stations_morning ~ date - days(1), TRUE ~ date)) %&gt;% # CoCoRaHS stations are recorded the next day at 7 am (and CB at 9 am), so set them back a day
+  mutate(prcp_mm = ifelse(id==&quot;USC00051959&quot; &amp; date %in% c(ymd(&quot;2000-08-03&quot;),ymd(&quot;2018-07-28&quot;)), NA, prcp_mm)) #cut 2 extreme precip values at CB station not recorded by other stations</code></pre>
 </div>
 <div id="cocorahs" class="section level2">
 <h2>CoCoRaHS</h2>
@@ -1527,7 +1528,7 @@ autoplot(map.latlon) +
 <pre class="r"><code>daily_long_7am %&gt;% mutate(yr = year(date)) %&gt;% 
   filter(yday(date) &gt;100, yday(date) &lt; 240, yr %in% 2018:2020) %&gt;%
   ggplot(aes(x=yday(date), y=prcp_mm, color=stations_name[id], shape=ground_covered)) +  
-  geom_point() + facet_wrap(vars(yr), ncol=1) + scale_color_manual(values=stations_pal) + 
+  geom_point() + facet_wrap(vars(yr)) + scale_color_manual(values=stations_pal) + #ncol=1 
   labs(x=&quot;Day of year&quot;, y = &quot;Precipitation (mm)&quot;, color=&quot;Station&quot;, shape=&quot;Snow cover&quot;) + 
   theme(legend.position = &quot;top&quot;)</code></pre>
 <p><img src="images_weather/weather_daily-1.png" width="672" /></p>
@@ -1612,6 +1613,11 @@ ggplot(monthly_all_7am %&gt;%  mutate(season=factor(c(&quot;Oct-May&quot;,&quot;
    stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
   labs(color=&quot;Season&quot;, y=stations_source_name[&quot;GTH161&quot;], x=stations_source_name[&quot;USC00051959&quot;], title=&quot;Monthly totals&quot;))</code></pre>
 <p><img src="images_weather/EPA_NOAA_fill-2.png" width="672" /></p>
+<pre class="r"><code>ggplot(daily_all_7am, aes(y=US1COGN0018, x= USC00051959, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(method=&quot;lm&quot;, se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,&quot;x&quot;, ..rr.label.., sep = &quot;~~~&quot;)), parse = T) +
+  labs(color=&quot;Snow cover&quot;, y=stations_source_name[&quot;US1COGN0018&quot;], x=stations_source_name[&quot;USC00051959&quot;], title=&quot;Daily totals&quot;)</code></pre>
+<p><img src="images_weather/EPA_NOAA_fill-3.png" width="672" /></p>
 </div>
 <div id="normal-ratio-method" class="section level2">
 <h2>Normal ratio method</h2>
@@ -1629,11 +1635,17 @@ ggplot(monthly_all_7am %&gt;%  mutate(season=factor(c(&quot;Oct-May&quot;,&quot;
 relative_to_CB &lt;- daily_all_7am %&gt;% drop_na(ground_covered) %&gt;% 
   group_by(year=year(date), ground_covered) %&gt;% summarize(across(-c(date), ~mean(.x, na.rm=T)/mean(USC00051959, na.rm=T)))
 
-relative_to_CB %&gt;% pivot_longer(-c(year, ground_covered), names_to=&quot;id&quot;, values_to=&quot;prcp_rel_CB&quot;) %&gt;% 
+relative_to_CB %&gt;% pivot_longer(-c(year, ground_covered), names_to=&quot;id&quot;, values_to=&quot;prcp_rel_CB&quot;) %&gt;% drop_na(prcp_rel_CB) %&gt;% 
   ggplot(aes(y=stations_source_name[id], x=prcp_rel_CB, color=ground_covered))+ 
-  geom_vline(xintercept=1) + geom_boxplot() + scale_x_continuous(breaks=0:6)+
+  geom_vline(xintercept=1) + geom_boxplot() + scale_x_continuous(breaks=0:6, limits=c(0,4.1))+
   labs(x=&quot;Mean daily precipitation relative to Crested Butte&quot;, y=&quot;&quot;, color=&quot;Snow cover&quot;) + theme(legend.position = &quot;top&quot;)</code></pre>
 <p><img src="images_weather/EPA_CB_fill-1.png" width="672" /></p>
+<pre class="r"><code>relative_to_CB %&gt;% pivot_longer(-c(year, ground_covered), names_to=&quot;id&quot;, values_to=&quot;prcp_rel_CB&quot;) %&gt;% drop_na(prcp_rel_CB) %&gt;% 
+  #group_by(year, ground_covered) %&gt;% summarize(prcp_rel_CB=mean(prcp_rel_CB)) %&gt;% 
+  ggplot(aes(color=stations_name[id], x= year, y=prcp_rel_CB, linetype=ground_covered))+ geom_line(size=1)+
+  scale_color_manual(values=stations_pal)+ ylim(c(0,4.1))+
+  labs(x=&quot;Mean daily precipitation relative to Crested Butte&quot;, y=&quot;&quot;, color=&quot;Snow cover&quot;) + theme(legend.position = &quot;top&quot;)</code></pre>
+<p><img src="images_weather/EPA_CB_fill-2.png" width="672" /></p>
 <pre class="r"><code>EPA_CB_summer_factor &lt;- relative_to_CB %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% drop_na(GTH161) %&gt;% pull(GTH161) %&gt;% mean
 
 daily_filled_7am &lt;- daily_all_7am %&gt;% 
@@ -1655,13 +1667,13 @@ ggplot(daily_filled_7am %&gt;% mutate(year=year(date)) %&gt;% filter(year&gt;=19
   labs(x=&quot;Day of year&quot;, y=&quot;EPA/NOAA precipiation (mm)&quot;, color=&quot;Filled from&quot;) + 
   theme_minimal() + theme(legend.position=&quot;top&quot;, panel.spacing = unit(0,&quot;pt&quot;), 
                           panel.grid.minor=element_blank(), panel.grid.major.x=element_blank())</code></pre>
-<p><img src="images_weather/EPA_CB_fill-2.png" width="672" /></p>
+<p><img src="images_weather/EPA_CB_fill-3.png" width="672" /></p>
 </div>
 </div>
 <div id="monthly-precip-1989-present" class="section level1">
 <h1>Monthly precip 1989-present</h1>
 <ul>
-<li>Recalculated Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station : 55.8517009 mm</li>
+<li>Recalculated Campbell and Wendlandt 2013 July average, 1989 - 2006 EPA station : 55.8954217 mm</li>
 <li>Maxfield water additions per month: 14 L applied to 4 m2 every 2 days = 1.75 mm daily precip * 31 days in July = 54.25 mm.</li>
 </ul>
 <pre class="r"><code>monthly_filled_7am %&gt;% filter(yr&gt;=2004) %&gt;% 
@@ -1725,17 +1737,25 @@ ggplot(monthly_all_7am, aes(y=GTH161,x= USC00051959, color=ifelse(mo %in% 6:9,mo
   mutate(drought_days = c(0,diff(date)), year=year(date)) %&gt;% filter(ground_covered==&quot;smmr&quot;) %&gt;% 
   select(year, date, drought_days) %&gt;% group_by(year) %&gt;% summarize(max_drought_days_2mm = max(drought_days)) %&gt;% 
   left_join(daily_filled_7am  %&gt;% filter(year(date)&gt;1989, year(date)&lt;2021, ground_covered==&quot;smmr&quot;) %&gt;% group_by(year=year(date)) %&gt;% 
-              summarize(rain_days_2mm = sum(EPA_NOAA_filled &gt; 2, na.rm=T),
+              summarize(snow_free_days = n(),
+                        rain_days_2mm = sum(EPA_NOAA_filled &gt; 2, na.rm=T),
+                        prop_rain_days_2mm = rain_days_2mm / snow_free_days,
                         max_precip_mm = max(EPA_NOAA_filled, na.rm=T),
+                        avg_precip_mm = mean(EPA_NOAA_filled, na.rm=T),
                         total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
 
-summary_names &lt;- c(max_drought_days_2mm=&quot;Longest drought (&lt; 2 mm precipitation)&quot;, 
-                   rain_days_2mm = &quot;Rain days (&gt; 2 mm precipitation)&quot;,
+summary_names &lt;- c(snow_free_days = &quot;Snowmelt to first permanent snowfall&quot;,
+                   max_drought_days_2mm=&quot;Longest drought (&lt; 2 mm precipitation)&quot;, 
+                   rain_days_2mm = &quot;Rainy days (&gt; 2 mm precipitation)&quot;,
+                   prop_rain_days_2mm = &quot;Proportion rainy days (&gt; 2 mm precipitation)&quot;,
                    max_precip_mm = &quot;Maximum daily precipitation (mm)&quot;,
+                   avg_precip_mm = &quot;Average daily precipitation (mm)&quot;,
                    total_precip_mm = &quot;Total precipitation (mm)&quot;)
 
-ggplot(summary_EPA_NOAA %&gt;% pivot_longer(!year), aes(y=value, x=year))+ 
+summary_EPA_NOAA %&gt;% pivot_longer(!year) %&gt;% filter(!name %in% c(&quot;rain_days_2mm&quot;,&quot;max_precip_mm&quot;,&quot;total_precip_mm&quot;)) %&gt;% 
+  ggplot(aes(y=value, x=year))+ 
   facet_wrap(vars(name), scales=&quot;free_y&quot;, labeller=as_labeller(summary_names)) +
+  annotate(&quot;rect&quot;, xmin=2017.5, xmax=2020.5, ymin=-Inf, ymax=Inf, fill=&quot;lightblue&quot;)+
   geom_smooth(method=&quot;lm&quot;, color=&quot;black&quot;, se=F) + geom_point(color=&quot;grey40&quot;) + labs(x=&quot;Year&quot;, y=&quot;&quot;) + 
   stat_poly_eq(formula = y ~ x, aes(label = paste(..rr.label.., ..p.value.label.., sep = &quot;~~~&quot;)), parse = T) +
   theme_bw() +theme(text=element_text(color=&quot;black&quot;, size=14), axis.text = element_text(color=&quot;black&quot;),

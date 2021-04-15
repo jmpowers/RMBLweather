@@ -187,7 +187,8 @@ daily_NOAA <- meteo_pull_monitors(NOAA_stations$id, keep_flags = T) %>%
   mutate(across(contains("flag"), as.factor)) %>% #All units are in tenths of mm, converted to mm here.
   mutate(across(c("prcp","snow","snwd","wesd","wesf"), ~ as.integer(.x)/10, .names="{.col}_mm"), .keep="unused") %>% 
   mutate(across(c("tmin","tavg","tmax"), ~ as.integer(.x)/10, .names="{.col}_C"), .keep="unused") %>% 
-  mutate(date = case_when(id %in% NOAA_stations_morning ~ date - days(1), TRUE ~ date)) # CoCoRaHS stations are recorded the next day at 7 am, so set them back a day
+  mutate(date = case_when(id %in% NOAA_stations_morning ~ date - days(1), TRUE ~ date)) %>% # CoCoRaHS stations are recorded the next day at 7 am (and CB at 9 am), so set them back a day
+  mutate(prcp_mm = ifelse(id=="USC00051959" & date %in% c(ymd("2000-08-03"),ymd("2018-07-28")), NA, prcp_mm)) #cut 2 extreme precip values at CB station not recorded by other stations
 ```
 
 ## CoCoRaHS
@@ -357,7 +358,7 @@ Compare summer precipitation data across [stations](#stations).
 daily_long_7am %>% mutate(yr = year(date)) %>% 
   filter(yday(date) >100, yday(date) < 240, yr %in% 2018:2020) %>%
   ggplot(aes(x=yday(date), y=prcp_mm, color=stations_name[id], shape=ground_covered)) +  
-  geom_point() + facet_wrap(vars(yr), ncol=1) + scale_color_manual(values=stations_pal) + 
+  geom_point() + facet_wrap(vars(yr)) + scale_color_manual(values=stations_pal) + #ncol=1 
   labs(x="Day of year", y = "Precipitation (mm)", color="Station", shape="Snow cover") + 
   theme(legend.position = "top")
 
@@ -443,6 +444,11 @@ ggplot(monthly_all_7am %>%  mutate(season=factor(c("Oct-May","Jun-Sept"))[1+mo %
   geom_point(shape=1) + geom_smooth(span=0.6, se=F) + geom_smooth(method="lm", formula= y ~ x + 0, se=F) + geom_abline(intercept=0, slope=1) +
    stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T) +
   labs(color="Season", y=stations_source_name["GTH161"], x=stations_source_name["USC00051959"], title="Monthly totals"))
+
+ggplot(daily_all_7am, aes(y=US1COGN0018, x= USC00051959, color=ground_covered)) + coord_fixed()+
+  geom_point(shape=1) + geom_smooth(method="lm", se=F) + geom_abline(intercept=0, slope=1) + 
+   stat_poly_eq(formula = y ~ x + 0, aes(label = paste(..eq.label..,"x", ..rr.label.., sep = "~~~")), parse = T) +
+  labs(color="Snow cover", y=stations_source_name["US1COGN0018"], x=stations_source_name["USC00051959"], title="Daily totals")
 ```
 
 ## Normal ratio method
@@ -462,9 +468,15 @@ This method uses the ratio between the average annual precipitation at each stat
 relative_to_CB <- daily_all_7am %>% drop_na(ground_covered) %>% 
   group_by(year=year(date), ground_covered) %>% summarize(across(-c(date), ~mean(.x, na.rm=T)/mean(USC00051959, na.rm=T)))
 
-relative_to_CB %>% pivot_longer(-c(year, ground_covered), names_to="id", values_to="prcp_rel_CB") %>% 
+relative_to_CB %>% pivot_longer(-c(year, ground_covered), names_to="id", values_to="prcp_rel_CB") %>% drop_na(prcp_rel_CB) %>% 
   ggplot(aes(y=stations_source_name[id], x=prcp_rel_CB, color=ground_covered))+ 
-  geom_vline(xintercept=1) + geom_boxplot() + scale_x_continuous(breaks=0:6)+
+  geom_vline(xintercept=1) + geom_boxplot() + scale_x_continuous(breaks=0:6, limits=c(0,4.1))+
+  labs(x="Mean daily precipitation relative to Crested Butte", y="", color="Snow cover") + theme(legend.position = "top")
+
+relative_to_CB %>% pivot_longer(-c(year, ground_covered), names_to="id", values_to="prcp_rel_CB") %>% drop_na(prcp_rel_CB) %>% 
+  #group_by(year, ground_covered) %>% summarize(prcp_rel_CB=mean(prcp_rel_CB)) %>% 
+  ggplot(aes(color=stations_name[id], x= year, y=prcp_rel_CB, linetype=ground_covered))+ geom_line(size=1)+
+  scale_color_manual(values=stations_pal)+ ylim(c(0,4.1))+
   labs(x="Mean daily precipitation relative to Crested Butte", y="", color="Snow cover") + theme(legend.position = "top")
 
 EPA_CB_summer_factor <- relative_to_CB %>% filter(ground_covered=="smmr") %>% drop_na(GTH161) %>% pull(GTH161) %>% mean
@@ -561,17 +573,25 @@ summary_EPA_NOAA <- daily_filled_7am %>% filter(year(date)>1989, year(date)<2021
   mutate(drought_days = c(0,diff(date)), year=year(date)) %>% filter(ground_covered=="smmr") %>% 
   select(year, date, drought_days) %>% group_by(year) %>% summarize(max_drought_days_2mm = max(drought_days)) %>% 
   left_join(daily_filled_7am  %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr") %>% group_by(year=year(date)) %>% 
-              summarize(rain_days_2mm = sum(EPA_NOAA_filled > 2, na.rm=T),
+              summarize(snow_free_days = n(),
+                        rain_days_2mm = sum(EPA_NOAA_filled > 2, na.rm=T),
+                        prop_rain_days_2mm = rain_days_2mm / snow_free_days,
                         max_precip_mm = max(EPA_NOAA_filled, na.rm=T),
+                        avg_precip_mm = mean(EPA_NOAA_filled, na.rm=T),
                         total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
 
-summary_names <- c(max_drought_days_2mm="Longest drought (< 2 mm precipitation)", 
-                   rain_days_2mm = "Rain days (> 2 mm precipitation)",
+summary_names <- c(snow_free_days = "Snowmelt to first permanent snowfall",
+                   max_drought_days_2mm="Longest drought (< 2 mm precipitation)", 
+                   rain_days_2mm = "Rainy days (> 2 mm precipitation)",
+                   prop_rain_days_2mm = "Proportion rainy days (> 2 mm precipitation)",
                    max_precip_mm = "Maximum daily precipitation (mm)",
+                   avg_precip_mm = "Average daily precipitation (mm)",
                    total_precip_mm = "Total precipitation (mm)")
 
-ggplot(summary_EPA_NOAA %>% pivot_longer(!year), aes(y=value, x=year))+ 
+summary_EPA_NOAA %>% pivot_longer(!year) %>% filter(!name %in% c("rain_days_2mm","max_precip_mm","total_precip_mm")) %>% 
+  ggplot(aes(y=value, x=year))+ 
   facet_wrap(vars(name), scales="free_y", labeller=as_labeller(summary_names)) +
+  annotate("rect", xmin=2017.5, xmax=2020.5, ymin=-Inf, ymax=Inf, fill="lightblue")+
   geom_smooth(method="lm", color="black", se=F) + geom_point(color="grey40") + labs(x="Year", y="") + 
   stat_poly_eq(formula = y ~ x, aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")), parse = T) +
   theme_bw() +theme(text=element_text(color="black", size=14), axis.text = element_text(color="black"),
