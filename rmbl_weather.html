@@ -11,7 +11,7 @@
 
 <meta name="author" content="John Powers" />
 
-<meta name="date" content="2021-04-14" />
+<meta name="date" content="2021-04-15" />
 
 <title>RMBL Weather Data</title>
 
@@ -257,7 +257,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">RMBL Weather Data</h1>
 <h4 class="author"><a href="http://sites.uci.edu/powers/">John Powers</a></h4>
-<h4 class="date">2021-04-14</h4>
+<h4 class="date">2021-04-15</h4>
 
 </div>
 
@@ -1744,23 +1744,79 @@ ggplot(monthly_all_7am, aes(y=GTH161,x= USC00051959, color=ifelse(mo %in% 6:9,mo
                         avg_precip_mm = mean(EPA_NOAA_filled, na.rm=T),
                         total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
 
-summary_names &lt;- c(snow_free_days = &quot;Snowmelt to first permanent snowfall&quot;,
-                   max_drought_days_2mm=&quot;Longest drought (&lt; 2 mm precipitation)&quot;, 
-                   rain_days_2mm = &quot;Rainy days (&gt; 2 mm precipitation)&quot;,
-                   prop_rain_days_2mm = &quot;Proportion rainy days (&gt; 2 mm precipitation)&quot;,
-                   max_precip_mm = &quot;Maximum daily precipitation (mm)&quot;,
-                   avg_precip_mm = &quot;Average daily precipitation (mm)&quot;,
+summary_names &lt;- c(snow_free_days = &quot;Snowmelt to first permanent snowfall (days)&quot;,
+                   max_drought_days_2mm=&quot;Longest drought &lt; 2 mm/day (days)&quot;, 
+                   rain_days_2mm = &quot;Days with &gt; 2 mm precipitation&quot;,
+                   prop_rain_days_2mm = &quot;Proportion days &gt; 2 mm precipitation&quot;,
+                   max_precip_mm = &quot;Maximum precipitation (mm/day)&quot;,
+                   avg_precip_mm = &quot;Average precipitation (mm/day)&quot;,
                    total_precip_mm = &quot;Total precipitation (mm)&quot;)
 
 summary_EPA_NOAA %&gt;% pivot_longer(!year) %&gt;% filter(!name %in% c(&quot;rain_days_2mm&quot;,&quot;max_precip_mm&quot;,&quot;total_precip_mm&quot;)) %&gt;% 
   ggplot(aes(y=value, x=year))+ 
   facet_wrap(vars(name), scales=&quot;free_y&quot;, labeller=as_labeller(summary_names)) +
   annotate(&quot;rect&quot;, xmin=2017.5, xmax=2020.5, ymin=-Inf, ymax=Inf, fill=&quot;lightblue&quot;)+
-  geom_smooth(method=&quot;lm&quot;, color=&quot;black&quot;, se=F) + geom_point(color=&quot;grey40&quot;) + labs(x=&quot;Year&quot;, y=&quot;&quot;) + 
-  stat_poly_eq(formula = y ~ x, aes(label = paste(..rr.label.., ..p.value.label.., sep = &quot;~~~&quot;)), parse = T) +
+  geom_smooth(method=&quot;lm&quot;, color=&quot;black&quot;, se=F) + geom_point(color=&quot;grey60&quot;) + labs(x=&quot;Year&quot;, y=&quot;&quot;) + 
+  stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = &quot;~~~&quot;)), parse = T) +
   theme_bw() +theme(text=element_text(color=&quot;black&quot;, size=14), axis.text = element_text(color=&quot;black&quot;),
                             axis.title.y= element_blank(), strip.background = element_blank())</code></pre>
 <p><img src="images_weather/precip_trend-3.png" width="672" /></p>
+<pre class="r"><code>summary_EPA_NOAA %&gt;% summarize(across(-year, mean, na.rm=T)) %&gt;% kable(caption = &quot;Averages 1990-2020&quot;)</code></pre>
+<table>
+<caption>
+Averages 1990-2020
+</caption>
+<thead>
+<tr>
+<th style="text-align:right;">
+max_drought_days_2mm
+</th>
+<th style="text-align:right;">
+snow_free_days
+</th>
+<th style="text-align:right;">
+rain_days_2mm
+</th>
+<th style="text-align:right;">
+prop_rain_days_2mm
+</th>
+<th style="text-align:right;">
+max_precip_mm
+</th>
+<th style="text-align:right;">
+avg_precip_mm
+</th>
+<th style="text-align:right;">
+total_precip_mm
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+31.70968
+</td>
+<td style="text-align:right;">
+167.7097
+</td>
+<td style="text-align:right;">
+29.83871
+</td>
+<td style="text-align:right;">
+0.1785583
+</td>
+<td style="text-align:right;">
+21.74889
+</td>
+<td style="text-align:right;">
+1.324491
+</td>
+<td style="text-align:right;">
+220.3063
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div id="summer-precip-trends-1909-present" class="section level1">
 <h1>Summer precip trends 1909-present</h1>

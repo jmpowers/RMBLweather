@@ -10,7 +10,7 @@ output:
     toc: yes
     toc_float: TRUE
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 <style type="text/css">
 .main-container { max-width: 1000px; margin-left: 0; margin-right: auto; }
@@ -580,22 +580,24 @@ summary_EPA_NOAA <- daily_filled_7am %>% filter(year(date)>1989, year(date)<2021
                         avg_precip_mm = mean(EPA_NOAA_filled, na.rm=T),
                         total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
 
-summary_names <- c(snow_free_days = "Snowmelt to first permanent snowfall",
-                   max_drought_days_2mm="Longest drought (< 2 mm precipitation)", 
-                   rain_days_2mm = "Rainy days (> 2 mm precipitation)",
-                   prop_rain_days_2mm = "Proportion rainy days (> 2 mm precipitation)",
-                   max_precip_mm = "Maximum daily precipitation (mm)",
-                   avg_precip_mm = "Average daily precipitation (mm)",
+summary_names <- c(snow_free_days = "Snowmelt to first permanent snowfall (days)",
+                   max_drought_days_2mm="Longest drought < 2 mm/day (days)", 
+                   rain_days_2mm = "Days with > 2 mm precipitation",
+                   prop_rain_days_2mm = "Proportion days > 2 mm precipitation",
+                   max_precip_mm = "Maximum precipitation (mm/day)",
+                   avg_precip_mm = "Average precipitation (mm/day)",
                    total_precip_mm = "Total precipitation (mm)")
 
 summary_EPA_NOAA %>% pivot_longer(!year) %>% filter(!name %in% c("rain_days_2mm","max_precip_mm","total_precip_mm")) %>% 
   ggplot(aes(y=value, x=year))+ 
   facet_wrap(vars(name), scales="free_y", labeller=as_labeller(summary_names)) +
   annotate("rect", xmin=2017.5, xmax=2020.5, ymin=-Inf, ymax=Inf, fill="lightblue")+
-  geom_smooth(method="lm", color="black", se=F) + geom_point(color="grey40") + labs(x="Year", y="") + 
-  stat_poly_eq(formula = y ~ x, aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")), parse = T) +
+  geom_smooth(method="lm", color="black", se=F) + geom_point(color="grey60") + labs(x="Year", y="") + 
+  stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")), parse = T) +
   theme_bw() +theme(text=element_text(color="black", size=14), axis.text = element_text(color="black"),
                             axis.title.y= element_blank(), strip.background = element_blank())
+
+summary_EPA_NOAA %>% summarize(across(-year, mean, na.rm=T)) %>% kable(caption = "Averages 1990-2020")
 ```
 
 # Summer precip trends 1909-present
