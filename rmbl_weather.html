@@ -11,7 +11,7 @@
 
 <meta name="author" content="John Powers" />
 
-<meta name="date" content="2021-04-15" />
+<meta name="date" content="2021-04-19" />
 
 <title>RMBL Weather Data</title>
 
@@ -257,7 +257,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">RMBL Weather Data</h1>
 <h4 class="author"><a href="http://sites.uci.edu/powers/">John Powers</a></h4>
-<h4 class="date">2021-04-15</h4>
+<h4 class="date">2021-04-19</h4>
 
 </div>
 
@@ -1758,8 +1758,8 @@ summary_EPA_NOAA %&gt;% pivot_longer(!year) %&gt;% filter(!name %in% c(&quot;rai
   annotate(&quot;rect&quot;, xmin=2017.5, xmax=2020.5, ymin=-Inf, ymax=Inf, fill=&quot;lightblue&quot;)+
   geom_smooth(method=&quot;lm&quot;, color=&quot;black&quot;, se=F) + geom_point(color=&quot;grey60&quot;) + labs(x=&quot;Year&quot;, y=&quot;&quot;) + 
   stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = &quot;~~~&quot;)), parse = T) +
-  theme_bw() +theme(text=element_text(color=&quot;black&quot;, size=14), axis.text = element_text(color=&quot;black&quot;),
-                            axis.title.y= element_blank(), strip.background = element_blank())</code></pre>
+  theme_minimal() +theme(axis.title.y= element_blank(), text=element_text(color=&quot;black&quot;, size=14), 
+                         axis.text = element_text(color=&quot;black&quot;),  panel.border = element_rect(fill=NA, colour = &quot;black&quot;))</code></pre>
 <p><img src="images_weather/precip_trend-3.png" width="672" /></p>
 <pre class="r"><code>summary_EPA_NOAA %&gt;% summarize(across(-year, mean, na.rm=T)) %&gt;% kable(caption = &quot;Averages 1990-2020&quot;)</code></pre>
 <table>

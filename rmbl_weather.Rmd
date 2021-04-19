@@ -594,8 +594,8 @@ summary_EPA_NOAA %>% pivot_longer(!year) %>% filter(!name %in% c("rain_days_2mm"
   annotate("rect", xmin=2017.5, xmax=2020.5, ymin=-Inf, ymax=Inf, fill="lightblue")+
   geom_smooth(method="lm", color="black", se=F) + geom_point(color="grey60") + labs(x="Year", y="") + 
   stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")), parse = T) +
-  theme_bw() +theme(text=element_text(color="black", size=14), axis.text = element_text(color="black"),
-                            axis.title.y= element_blank(), strip.background = element_blank())
+  theme_minimal() +theme(axis.title.y= element_blank(), text=element_text(color="black", size=14), 
+                         axis.text = element_text(color="black"),  panel.border = element_rect(fill=NA, colour = "black"))
 
 summary_EPA_NOAA %>% summarize(across(-year, mean, na.rm=T)) %>% kable(caption = "Averages 1990-2020")
 ```
