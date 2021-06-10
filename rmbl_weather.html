@@ -11,11 +11,11 @@
 
 <meta name="author" content="John Powers" />
 
-<meta name="date" content="2021-04-19" />
+<meta name="date" content="2021-06-10" />
 
 <title>RMBL Weather Data</title>
 
-<script src="libs/header-attrs-2.7/header-attrs.js"></script>
+<script src="libs/header-attrs-2.8/header-attrs.js"></script>
 <script src="libs/jquery-1.11.3/jquery.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="libs/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
@@ -233,12 +233,12 @@ div.tocify {
 
 <!-- setup 3col/9col grid for toc_float and main content  -->
 <div class="row">
-<div class="col-sm-12 col-md-4 col-lg-3">
+<div class="col-xs-12 col-sm-4 col-md-3">
 <div id="TOC" class="tocify">
 </div>
 </div>
 
-<div class="toc-content col-sm-12 col-md-8 col-lg-9">
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
 
 
 
@@ -257,7 +257,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">RMBL Weather Data</h1>
 <h4 class="author"><a href="http://sites.uci.edu/powers/">John Powers</a></h4>
-<h4 class="date">2021-04-19</h4>
+<h4 class="date">2021-06-10</h4>
 
 </div>
 
@@ -1862,6 +1862,43 @@ daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, year(d
     ggplot(aes(x= year, y=tmin_mean)) + geom_smooth(span=0.3) + geom_point() + 
   labs(x=&quot;Year&quot;, y=&quot;Average minimum temperature (C, day 120-270, Crested Butte)&quot;)</code></pre>
 <p><img src="images_weather/precip_trend_long-7.png" width="672" /></p>
+</div>
+<div id="summer-temperature-trends-1909-present" class="section level1">
+<h1>Summer temperature trends 1909-present</h1>
+<pre class="r"><code>ggplot(daily_GTH161, aes(y=TEMPERATURE, x= date, color=month(date) %in% 5:7))+ geom_line(aes(group=1)) + labs(color=&quot;May-July&quot;, title=&quot;GTH161 mean temp&quot;)</code></pre>
+<p><img src="images_weather/temp_trend_long-1.png" width="672" /></p>
+<pre class="r"><code>daily_GTH161 %&gt;% filter(month(date) %in% 5:7) %&gt;% group_by(year=year(date)) %&gt;% summarize(days_missing=sum(is.na(TEMPERATURE))) %&gt;% print(n=23)#too much missing temp data</code></pre>
+<pre><code># A tibble: 23 x 2
+    year days_missing
+   &lt;dbl&gt;        &lt;int&gt;
+ 1  1989            0
+ 2  1990           58
+ 3  1991           61
+ 4  1992            9
+ 5  1993            0
+ 6  1994            2
+ 7  1995            6
+ 8  1996            0
+ 9  1997            8
+10  1998           17
+11  1999            0
+12  2000           19
+13  2001           14
+14  2002            0
+15  2003            0
+16  2004           16
+17  2005            0
+18  2006            9
+19  2007            0
+20  2008            0
+21  2009            0
+22  2010            0
+23  2011            0</code></pre>
+<pre class="r"><code>ggplot(daily_NOAA %&gt;% filter(id==&quot;USC00051959&quot;), aes(y=tmax_C, x= date))+ geom_line() + labs(&quot;CB max temp&quot;) #CB station does not have mean temp, only max and min</code></pre>
+<p><img src="images_weather/temp_trend_long-2.png" width="672" /></p>
+<pre class="r"><code>daily_NOAA  %&gt;% filter(id==&quot;USC00051959&quot;, year(date)&gt;1909, month(date) %in% 5:7) %&gt;% group_by(year=year(date)) %&gt;% 
+  summarize(tmax_C_mean = mean(tmax_C, na.rm=T), days_missing=sum(is.na(tmax_C))) %&gt;% ggplot(aes(x=year, y=tmax_C_mean)) + geom_point() + geom_smooth()</code></pre>
+<p><img src="images_weather/temp_trend_long-3.png" width="672" /></p>
 </div>
 <div id="snowmelt-timing-1976-present" class="section level1">
 <h1>Snowmelt timing 1976-present</h1>

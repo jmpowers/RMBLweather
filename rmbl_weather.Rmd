@@ -10,7 +10,7 @@ output:
     toc: yes
     toc_float: TRUE
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 <style type="text/css">
 .main-container { max-width: 1000px; margin-left: 0; margin-right: auto; }
@@ -646,6 +646,18 @@ daily_NOAA %>% filter(id=="USC00051959", year(date)>1909, yday(date)>=120, yday(
     ggplot(aes(x= year, y=tmin_mean)) + geom_smooth(span=0.3) + geom_point() + 
   labs(x="Year", y="Average minimum temperature (C, day 120-270, Crested Butte)")
 ```
+
+# Summer temperature trends 1909-present
+
+```{r temp_trend_long}
+ggplot(daily_GTH161, aes(y=TEMPERATURE, x= date, color=month(date) %in% 5:7))+ geom_line(aes(group=1)) + labs(color="May-July", title="GTH161 mean temp")
+daily_GTH161 %>% filter(month(date) %in% 5:7) %>% group_by(year=year(date)) %>% summarize(days_missing=sum(is.na(TEMPERATURE))) %>% print(n=23)#too much missing temp data
+
+ggplot(daily_NOAA %>% filter(id=="USC00051959"), aes(y=tmax_C, x= date))+ geom_line() + labs("CB max temp") #CB station does not have mean temp, only max and min
+daily_NOAA  %>% filter(id=="USC00051959", year(date)>1909, month(date) %in% 5:7) %>% group_by(year=year(date)) %>% 
+  summarize(tmax_C_mean = mean(tmax_C, na.rm=T), days_missing=sum(is.na(tmax_C))) %>% ggplot(aes(x=year, y=tmax_C_mean)) + geom_point() + geom_smooth()
+```
+
 
 # Snowmelt timing 1976-present
 
