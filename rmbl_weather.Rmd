@@ -239,14 +239,14 @@ gsodr.inventory <- get_inventory() %>% #long download
 groundcover <- read_tsv("./data/gothicwx/groundcover.tsv") %>% 
   mutate(across(starts_with("first"), list(day=yday)), year=year(first_0_cm))
 
-groundcover_2021 <- tibble(first_snow=ymd("2020-10-25"), first_0_cm=ymd("2021-05-01")) 
-#TODO check this first permanent snow of 2020 (not yet on billy's website), and fill in actual value for first_0_cm
+groundcover_2023 <- tibble(first_snow=ymd("2022-10-23"), first_0_cm=ymd("2023-05-01")) 
+#TODO fill in actual value for first_0_cm in 2023
 
 get_seasons <- function(dates) { 
   factor(c("smmr","wntr"))[ifelse(year(dates) < min(groundcover$year), NA, 
          1+dates %in% do.call(c, 
-                             map2(bind_rows(groundcover, groundcover_2021)$first_snow, 
-                                  bind_rows(groundcover, groundcover_2021)$first_0_cm, 
+                             map2(bind_rows(groundcover, groundcover_2023)$first_snow, 
+                                  bind_rows(groundcover, groundcover_2023)$first_0_cm, 
                                   ~ seq(date(.x), date(.y), by="day"))))]
 }
 ```
@@ -262,7 +262,7 @@ daily_all <-
   full_join(daily_WRCC %>% filter(id=="CORBIL"), by="date") %>% 
   rename(EPA_RsrchMdw=PRECIPITATION, ESSDIVE_GoldLink=Precip, WRCC_billy=precip_mm, NOAA_billy=prcp_mm) %>% 
   mutate(yr = year(date), mo = month(date, label=F),
-         ground_covered = get_seasons(date)) %>% filter(year(date) < 2021)
+         ground_covered = get_seasons(date)) %>% filter(year(date) < 2023)
 
 #Combine all the weather stations daily precip and temperature statistics in long format
 daily_long <- bind_rows( 
@@ -272,7 +272,7 @@ daily_long <- bind_rows(
   bind_rows(daily_WRCC %>% select(id, date, tavg_C = av_temp_air_C, 
                                   tmax_C = max_av_temp_air_C, tmin_C = min_av_temp_air_C, 
                                   prcp_mm = precip_mm)) %>%  
-  bind_rows(daily_NOAA %>% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %>% mutate(id=factor(id))%>% filter(year(date) < 2021)
+  bind_rows(daily_NOAA %>% select(id, date, tavg_C, tmax_C, tmin_C, prcp_mm)) %>% mutate(id=factor(id))%>% filter(year(date) < 2023)
 
 # The datasets summarized to line up with the morning collections
 daily_long_7am <- bind_rows( 
@@ -280,7 +280,7 @@ daily_long_7am <- bind_rows(
   KCOMTCRE2 = daily_KCOMTCRE2_7am %>% select(date, prcp_mm = Precip), .id="id") %>% 
   bind_rows(daily_WRCC_7am %>% select(id, date, prcp_mm = precip_mm)) %>%  
   bind_rows(daily_NOAA %>% select(id, date, prcp_mm)) %>% # morning stations shifted back a day
-  mutate(ground_covered = get_seasons(date)) %>% filter(year(date) < 2021)
+  mutate(ground_covered = get_seasons(date)) %>% filter(year(date) < 2023)
 
 daily_all_7am <- daily_long_7am %>% 
   pivot_wider(names_from="id", values_from="prcp_mm") %>% arrange(date)
@@ -304,7 +304,7 @@ all_stations <- bind_rows(
     mutate(element="PRCP")) %>% 
   mutate(source_name = paste(source, name, sep="_"), 
          short_name = str_replace(name, "CRESTED BUTTE","CB"),
-         color = c(brewer.pal(8, "Set1"), "black", brewer.pal(9, "Set1")[9], brewer.pal(6, "Dark2"))) %>% 
+         color = c(brewer.pal(8, "Set1")[1:6],"grey80", brewer.pal(8, "Set1")[7:8],"black", brewer.pal(9, "Set1")[9], brewer.pal(6, "Dark2"))) %>% 
   rows_patch(daily_long %>% drop_na(prcp_mm)  %>% group_by(id) %>% summarize(first_year=min(year(date)), last_year=max(year(date))))
 stations_pal <- with(all_stations, set_names(color, short_name))
 stations_name <- with(all_stations, set_names(short_name, id))
@@ -321,9 +321,9 @@ all_stations %>% select(-c(state, gsn_flag, wmo_id, source_name, short_name, col
 Map of stations, excluding Almont
 ```{r station_map}
 library(OpenStreetMap)
-map <- openmap(c(39.05, -107.1), c(38.85, -106.9), type = "stamen-terrain")
+map <- openmap(c(39.05, -107.1), c(38.85, -106.9), type="opencyclemap")#, type = "stamen-terrain"
 map.latlon <- openproj(map, projection = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
-autoplot(map.latlon) + 
+OpenStreetMap::autoplot.OpenStreetMap(map.latlon) + 
   geom_point(data=filter(all_stations, !(id %in% c("CORALM", "EPA_NOAA_filled"))), 
              aes(x=longitude, y=latitude, color=short_name), size=2) + 
   theme(legend.position="bottom", axis.title=element_blank()) + labs(color="Station") +
@@ -552,8 +552,8 @@ monthly_filled_7am %>% filter(yr >= 1989, mo %in% 5:9) %>% ggplot(aes(x=yr, colo
 
 Combined EPA Research Meadow / NOAA Crested Butte dataset from summers 1990-2020
 
-```{r precip_trend}
-daily_filled_7am %>% filter(year(date)>1989, year(date)<2021) %>%
+```{r precip_trend, fig.width=8}
+daily_filled_7am %>% filter(year(date)>1989, year(date)<2023) %>%
   mutate(julian = yday(date), decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>%
   group_by(julian, decade) %>% 
   summarize(EPA_NOAA_filled = mean(EPA_NOAA_filled, na.rm=T), ground_covered=mean(as.integer(ground_covered), na.rm=T)-1) %>% 
@@ -562,42 +562,53 @@ daily_filled_7am %>% filter(year(date)>1989, year(date)<2021) %>%
   labs(x="Day of year", y="Mean EPA/NOAA precipiation (mm)", color="Decade", title="Snowmelt and monsoon timing by decade") +
     scale_color_brewer(palette = "Set1", direction = -1) + theme_minimal()
 
-daily_filled_7am %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr", EPA_NOAA_filled > 0) %>%   
+daily_filled_7am %>% filter(year(date)>1989, year(date)<2023, ground_covered=="smmr", EPA_NOAA_filled > 0) %>%   
   mutate(decade = factor(floor(year(date)/10)*10), decade = recode(decade, "2020"="2010")) %>% group_by(decade) %>% 
   ggplot(aes(x=EPA_NOAA_filled, color=decade)) + geom_density() +
     labs(x="EPA/NOAA precipiation (mm)", y="Proportion", color="Decade", title="Intensity spectrum of summer rainstorms > 0 mm") +
       scale_color_brewer(palette = "Set1", direction = -1) + 
   scale_x_continuous(breaks=scales::breaks_extended(10)) + theme_minimal()
 
-summary_EPA_NOAA <- daily_filled_7am %>% filter(year(date)>1989, year(date)<2021, EPA_NOAA_filled > 2) %>% 
+summary_EPA_NOAA <- daily_filled_7am %>% filter(year(date)>1989, year(date)<2023, EPA_NOAA_filled > 2) %>% 
   mutate(drought_days = c(0,diff(date)), year=year(date)) %>% filter(ground_covered=="smmr") %>% 
   select(year, date, drought_days) %>% group_by(year) %>% summarize(max_drought_days_2mm = max(drought_days)) %>% 
-  left_join(daily_filled_7am  %>% filter(year(date)>1989, year(date)<2021, ground_covered=="smmr") %>% group_by(year=year(date)) %>% 
+  left_join(daily_filled_7am  %>% filter(year(date)>1989, year(date)<2023, ground_covered=="smmr") %>% group_by(year=year(date)) %>% 
               summarize(snow_free_days = n(),
                         rain_days_2mm = sum(EPA_NOAA_filled > 2, na.rm=T),
                         prop_rain_days_2mm = rain_days_2mm / snow_free_days,
                         max_precip_mm = max(EPA_NOAA_filled, na.rm=T),
                         avg_precip_mm = mean(EPA_NOAA_filled, na.rm=T),
-                        total_precip_mm = sum(EPA_NOAA_filled, na.rm=T)))
+                        total_precip_mm = sum(EPA_NOAA_filled, na.rm=T),
+                        days_until_2mm = min(which(EPA_NOAA_filled> 1)),
+                        date_first_2mm = yday(date[days_until_2mm])))
 
-summary_names <- c(snow_free_days = "Snowmelt to first permanent snowfall (days)",
-                   max_drought_days_2mm="Longest drought < 2 mm/day (days)", 
-                   rain_days_2mm = "Days with > 2 mm precipitation",
-                   prop_rain_days_2mm = "Proportion days > 2 mm precipitation",
-                   max_precip_mm = "Maximum precipitation (mm/day)",
-                   avg_precip_mm = "Average precipitation (mm/day)",
-                   total_precip_mm = "Total precipitation (mm)")
+summary_names <- c(snow_free_days = "Snowmelt to first permanent snowfall (d)",
+                   max_drought_days_2mm="Longest drought < 2 mm/d (d)", 
+                   rain_days_2mm = "Days with > 2 mm precip",
+                   prop_rain_days_2mm = "Proportion days > 2 mm precip",
+                   max_precip_mm = "Maximum precip (mm/d)",
+                   avg_precip_mm = "Average precip (mm/d)",
+                   total_precip_mm = "Total precip (mm)",
+                   days_until_2mm = "Snowmelt to first > 2 mm precip (d)",
+                   date_first_2mm = "First > 2 mm precip after snowmelt (day of year)")
 
-summary_EPA_NOAA %>% pivot_longer(!year) %>% filter(!name %in% c("rain_days_2mm","max_precip_mm","total_precip_mm")) %>% 
+summary_EPA_NOAA %>% pivot_longer(!year) %>% filter(name %in% c("avg_precip_mm","max_drought_days_2mm","prop_rain_days_2mm")) %>% 
   ggplot(aes(y=value, x=year))+ 
   facet_wrap(vars(name), scales="free_y", labeller=as_labeller(summary_names)) +
   annotate("rect", xmin=2017.5, xmax=2020.5, ymin=-Inf, ymax=Inf, fill="lightblue")+
   geom_smooth(method="lm", color="black", se=F) + geom_point(color="grey60") + labs(x="Year", y="") + 
-  stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")), parse = T) +
+  scale_y_continuous(limits=c(0, NA), expand = expansion(mult=c(0, 0.05))) + 
+  #stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")), parse = T) +
   theme_minimal() +theme(axis.title.y= element_blank(), text=element_text(color="black", size=14), 
                          axis.text = element_text(color="black"),  panel.border = element_rect(fill=NA, colour = "black"))
 
 summary_EPA_NOAA %>% summarize(across(-year, mean, na.rm=T)) %>% kable(caption = "Averages 1990-2020")
+summary_EPA_NOAA %>% summarize(across(-year, sd,   na.rm=T)) %>% kable(caption = "Standard deviation 1990-2020")
+
+library(broom)
+summary_EPA_NOAA %>% pivot_longer(!year) %>% group_by(name) %>% nest() %>% 
+  mutate(model = map(data, ~ lm(value ~ year, data = .)),
+         coefs = map(model, tidy)) %>% select(-c(data, model)) %>% unnest(coefs) %>% kable(caption = "Regression coefficients 1990-2020")
 ```
 
 # Summer precip trends 1909-present
@@ -667,7 +678,13 @@ groundcover %>% mutate(first_snow_day=first_snow_day-365) %>%
   mutate(threshold = fct_reorder(factor(threshold),day, na.rm=T, .desc=T)) %>% 
   ggplot(aes(x=year, y=day, color=threshold)) +  
   geom_line(aes(group=year), size=2)+ geom_smooth( method="lm", se=F) +geom_point() +
-  scale_x_continuous(minor_breaks = 1976:2020, position = "top") + scale_y_continuous(n.breaks=10)+
+  scale_x_continuous(minor_breaks = 1976:2022, position = "top") + scale_y_continuous(n.breaks=10)+
   scale_color_grey(labels=function(x) str_to_sentence(str_replace_all(x, "_", " ")), start=0, end=0.85) +
   labs(x="Year", y="Day of year", color="Threshold") + theme_minimal()
+
+list("0cm"=coef(lm(first_0_cm_day ~ year, data=groundcover)),
+     "50cm"=coef(lm(first_50_cm_day ~ year, data=groundcover)),
+     "100cm"=coef(lm(first_100_cm_day ~ year, data=groundcover)),
+     "firstsnow"=coef(lm(first_snow_day ~ year, data=groundcover))) %>% 
+  bind_rows(.id="first_day_at") %>% select(-`(Intercept)`) %>% kable(caption="Change per year, 1980-2022", digits=2)
 ```
